@@ -10,7 +10,7 @@ resolver = "2"
 version    = "0.1.0"
 edition    = "2021"
 license    = "MIT OR Apache-2.0"
-repository = "https://github.com/your-org/graphite"
+repository = "https://github.com/Surayani02/graphite.git"
 
 # ── Shared dependency versions ─────────────────────────────────────────────
 [workspace.dependencies]

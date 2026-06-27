@@ -21,8 +21,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -78,7 +76,7 @@ jobs:
         run: cargo check --all-targets
 
       - name: Check (engine — WASM target)
-        run: cargo check --target wasm32-unknown-unknown -p forge-engine
+        run: cargo check --target wasm32-unknown-unknown -p graphite-engine
 
       - name: Bench compile check
         run: cargo bench --no-run
