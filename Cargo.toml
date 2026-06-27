@@ -1,0 +1,36 @@
+[workspace]
+members  = [
+    "apps/server",
+    "packages/engine",
+    "packages/document",
+]
+resolver = "2"
+
+[workspace.package]
+version    = "0.1.0"
+edition    = "2021"
+license    = "MIT OR Apache-2.0"
+repository = "https://github.com/your-org/graphite"
+
+# ── Shared dependency versions ─────────────────────────────────────────────
+[workspace.dependencies]
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow     = "1.0"
+thiserror  = "2.0"
+
+# ── Build profiles ─────────────────────────────────────────────────────────
+[profile.dev]
+opt-level = 0
+debug     = true
+
+[profile.release]
+opt-level     = 3
+lto           = true
+codegen-units = 1
+strip         = true
+
+# Optimised for WASM binary size — used from Phase 1 onward.
+[profile.release-wasm]
+inherits  = "release"
+opt-level = "s"

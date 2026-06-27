@@ -1,0 +1,20 @@
+[package]
+name        = "graphite-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Graphite backend server. Phase 0: scaffold."
+
+[[bin]]
+name = "graphite-server"
+path = "src/main.rs"
+
+[dependencies]
+# Phase 8 will add:
+#   axum      = { version = "0.8", features = ["ws", "macros"] }
+#   tokio     = { workspace = true }
+#   sqlx      = { version = "0.8", features = ["postgres", "runtime-tokio", "uuid"] }
+#   redis     = { version = "0.27", features = ["tokio-comp"] }
+#   serde     = { workspace = true }
+#   serde_json = { workspace = true }
+#   jsonwebtoken = "9"

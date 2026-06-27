@@ -1,0 +1,21 @@
+[package]
+name        = "graphite-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Graphite graphics engine (Rust → WASM). Phase 0: scaffold."
+repository  = "https://github.com/your-org/graphite"
+
+# ── Compile targets ────────────────────────────────────────────────────────
+# Phase 0: default lib (rlib) only.
+# Phase 1 will add: crate-type = ["cdylib", "rlib"] for WASM.
+
+[dependencies]
+# Phase 1: wasm-bindgen, web-sys, wgpu
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name    = "engine"
+harness = false

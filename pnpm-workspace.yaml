@@ -1,0 +1,15 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# ── pnpm 11: peer dependency behaviour ────────────────────────────────────────
+# These settings were in .npmrc in pnpm ≤10; pnpm 11 reads them only from here.
+strictPeerDependencies: false
+autoInstallPeers: true
+
+# ── pnpm 11: allow packages that run postinstall scripts ──────────────────────
+# pnpm 11 introduced allowBuilds to replace the removed onlyBuiltDependencies.
+# Turbo and esbuild each download a platform binary in their postinstall step.
+allowBuilds:
+  turbo: true
+  esbuild: true

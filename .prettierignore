@@ -1,0 +1,7 @@
+dist/
+pkg/
+target/
+node_modules/
+pnpm-lock.yaml
+Cargo.lock
+*.gen.ts
