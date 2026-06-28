@@ -36,6 +36,10 @@ mod tests {
 
     #[test]
     fn version_is_semver_like() {
-        assert!(version().contains('.'), "expected semver, got: {}", version());
+        assert!(
+            version().contains('.'),
+            "expected semver, got: {}",
+            version()
+        );
     }
 }

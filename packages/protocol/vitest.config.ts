@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/config"; // Keep importing from vitest/config
 
 export default defineConfig({
   test: {
@@ -15,9 +15,8 @@ export default defineConfig({
         statements: 90,
       },
     },
-  },
-  // Vitest 4: bench config is top-level, not nested under test
-  bench: {
-    include: ["src/__tests__/**/*.bench.ts"],
+    benchmark: {
+      include: ["src/__tests__/**/*.bench.ts"],
+    },
   },
 });

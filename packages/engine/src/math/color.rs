@@ -25,7 +25,12 @@ mod tests {
 
     #[test]
     fn white_normalises_to_ones() {
-        let c = Color { r: 255, g: 255, b: 255, a: 255 };
+        let c = Color {
+            r: 255,
+            g: 255,
+            b: 255,
+            a: 255,
+        };
         let f = c.to_f32_array();
         assert!((f[0] - 1.0).abs() < f32::EPSILON);
         assert!((f[3] - 1.0).abs() < f32::EPSILON);
@@ -33,7 +38,12 @@ mod tests {
 
     #[test]
     fn black_normalises_to_zeros_rgb() {
-        let c = Color { r: 0, g: 0, b: 0, a: 255 };
+        let c = Color {
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 255,
+        };
         let f = c.to_f32_array();
         assert_eq!(f[0], 0.0);
         assert_eq!(f[1], 0.0);

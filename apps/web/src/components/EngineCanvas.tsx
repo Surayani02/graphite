@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useEngine } from "../hooks/useEngine";
 
-const EngineCanvas=function() {
+const EngineCanvas = function () {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { initEngine, status, stats, error } = useEngine();
+  const { initEngine, status, stats } = useEngine();
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -50,6 +50,6 @@ const EngineCanvas=function() {
       </div>
     </div>
   );
-}
+};
 
 export default EngineCanvas;
