@@ -7,7 +7,7 @@ Open-source, browser-based, high-performance collaborative graphics platform.
 ## Prerequisites
 
 | Tool    | Min version | Install               |
-| ------- | ----------- | --------------------- |
+|---------|-------------|-----------------------|
 | Node.js | 24.0.0      | https://nodejs.org    |
 | pnpm    | 11.0.0      | `npm install -g pnpm` |
 | Rust    | stable      | https://rustup.rs     |
@@ -48,10 +48,10 @@ graphite/
 
 ## Development phases
 
-| Phase | Milestone                          | Status     |
-| ----- | ---------------------------------- | ---------- |
+| Phase | Milestone                          | Status    |
+|-------|------------------------------------|-----------|
 | 0     | Foundation (monorepo, tooling, CI) | ✅ Current |
-| 1     | Engine shell (WebGPU, Web Worker)  | 🔜 Next    |
+| 1     | Engine shell (WebGPU, Web Worker)  | 🔜 Next   |
 | 2     | Scene graph core (Rust/WASM)       | ⏳         |
 | 3     | Path rendering (GPU)               | ⏳         |
 | 4     | Interaction (select, pan, zoom)    | ⏳         |

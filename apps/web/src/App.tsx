@@ -1,4 +1,4 @@
-import { EngineCanvas } from "./components/EngineCanvas";
+import EngineCanvas from "./components/EngineCanvas";
 
 /**
  * Root application shell.

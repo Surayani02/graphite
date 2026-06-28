@@ -1,26 +1,28 @@
-//! Graphite Graphics Engine
-//!
-//! Phase 0: Foundation scaffold.
-//!
-//! # Architecture (to be populated in later phases)
-//!
-//! - **Phase 1** — WebGPU context, OffscreenCanvas, render loop.
-//! - **Phase 2** — Scene graph, R-tree spatial index, transform math.
-//! - **Phase 3** — GPU path rendering (rectangles, ellipses, fills, strokes).
-//! - **Phase 4** — Hit testing, selection, pan/zoom interaction.
-//!
-//! # Compilation targets
+//! Graphite Engine — Phase 2: Scene Graph Core
 //!
 //! This crate compiles to:
-//! - A native Rust library (`rlib`) for tests and benchmarks.
-//! - A WebAssembly module (`cdylib`, added in Phase 1) for the browser.
+//! - `cdylib` → WebAssembly module for the browser
+//! - `rlib`   → native library for `cargo test` and `cargo bench`
+//!
+//! Public API surface (all behind `#[wasm_bindgen]`):
+//! - `version()` → string
+//! - `SceneGraph` → arena scene graph with `add_frame`, `add_rect`,
+//!   `get_render_list`
 
-/// Returns the engine version string derived from `Cargo.toml`.
+use wasm_bindgen::prelude::*;
+
+pub mod math;
+pub mod scene;
+
+pub use scene::graph::SceneGraph;
+
+/// Returns the engine crate version from `Cargo.toml`.
 ///
-/// The TypeScript host uses this to assert the loaded WASM module version
-/// matches the expected version at runtime.
-pub fn version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
+/// The TypeScript host calls this after WASM initialisation to assert
+/// that the loaded module version matches the expected build.
+#[wasm_bindgen]
+pub fn version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
 }
 
 #[cfg(test)]
@@ -29,16 +31,11 @@ mod tests {
 
     #[test]
     fn version_is_not_empty() {
-        assert!(!version().is_empty(), "Engine version must not be empty");
+        assert!(!version().is_empty());
     }
 
     #[test]
     fn version_is_semver_like() {
-        // Minimal check: must contain at least one dot (e.g. "0.1.0").
-        assert!(
-            version().contains('.'),
-            "Engine version must be semver-like, got: {ver}",
-            ver = version()
-        );
+        assert!(version().contains('.'), "expected semver, got: {}", version());
     }
 }

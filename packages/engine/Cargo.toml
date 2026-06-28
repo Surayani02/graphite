@@ -3,15 +3,17 @@ name        = "graphite-engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Graphite graphics engine (Rust → WASM). Phase 0: scaffold."
-repository  = "https://github.com/your-org/graphite"
+description = "Graphite graphics engine (Rust → WASM)"
 
-# ── Compile targets ────────────────────────────────────────────────────────
-# Phase 0: default lib (rlib) only.
-# Phase 1 will add: crate-type = ["cdylib", "rlib"] for WASM.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# Tell wasm-opt to accept bulk-memory instructions that Rust 1.96+ generates
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O", "--enable-bulk-memory"]
 
 [dependencies]
-# Phase 1: wasm-bindgen, web-sys, wgpu
+wasm-bindgen = "0.2"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

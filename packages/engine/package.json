@@ -1,0 +1,23 @@
+{
+  "name": "@graphite/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Graphite graphics engine — Rust/WASM package",
+  "main": "./pkg/graphite_engine.js",
+  "types": "./pkg/graphite_engine.d.ts",
+  "exports": {
+    ".": {
+      "types": "./pkg/graphite_engine.d.ts",
+      "default": "./pkg/graphite_engine.js"
+    }
+  },
+  "scripts": {
+    "build": "wasm-pack build --target web --out-dir pkg --no-pack",
+    "build:dev": "wasm-pack build --target web --out-dir pkg --no-pack --dev",
+    "clean": "rimraf pkg"
+  },
+  "devDependencies": {
+    "rimraf": "^6.1.3"
+  }
+}

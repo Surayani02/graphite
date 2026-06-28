@@ -7,6 +7,7 @@
     "declaration": false,
     "declarationMap": false,
     "paths": {
+      "@graphite/engine": ["../../packages/engine/pkg/graphite_engine.d.ts"],
       "@graphite/protocol": ["../../packages/protocol/src/index.ts"],
       "@graphite/ui-core": ["../../packages/ui-core/src/index.ts"],
       "@graphite/crdt": ["../../packages/crdt/src/index.ts"],
