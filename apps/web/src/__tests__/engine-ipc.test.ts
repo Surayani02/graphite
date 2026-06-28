@@ -175,3 +175,47 @@ describe("Frame budget", () => {
     expect(delay).toBe(0);
   });
 });
+
+describe("Phase 4 viewport message", () => {
+  it("viewport:changed has x, y and zoom fields", () => {
+    const msg: EngineToMainMessage = {
+      type: "viewport:changed",
+      x: 375,
+      y: 315,
+      zoom: 1.5,
+    };
+    expect(msg.zoom).toBe(1.5);
+    expect(msg.x).toBe(375);
+  });
+
+  it("zoom pan arithmetic: scroll 100px at zoom 2 → 50 world units", () => {
+    const zoom = 2.0;
+    const deltaY = 100;
+    const worldPan = deltaY / zoom;
+    expect(worldPan).toBe(50);
+  });
+
+  it("zoom-on-cursor formula keeps world point fixed", () => {
+    // Camera at (100, 100), zoom 1, viewport 800×600
+    // Pivot cursor at physical (400, 300) — centre of viewport
+    // Pivot world = (400 - 400) / 1 + 100 = 100
+    const camX = 100,
+      camY = 100,
+      zoom = 1;
+    const vpW = 800,
+      vpH = 600;
+    const pivotPhysX = 400,
+      pivotPhysY = 300;
+
+    const pivotWorldX = (pivotPhysX - vpW / 2) / zoom + camX;
+    const pivotWorldY = (pivotPhysY - vpH / 2) / zoom + camY;
+
+    const newZoom = 2.0;
+    const newCamX = pivotWorldX - (pivotPhysX - vpW / 2) / newZoom;
+    const newCamY = pivotWorldY - (pivotPhysY - vpH / 2) / newZoom;
+    const newWorld = (pivotPhysX - vpW / 2) / newZoom + newCamX;
+
+    expect(newWorld).toBeCloseTo(pivotWorldX, 5); // pivot world unchanged
+    expect(newCamX).toBeCloseTo(50, 5); // camera moved to keep pivot fixed
+  });
+});

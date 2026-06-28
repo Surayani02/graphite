@@ -108,6 +108,14 @@ fn bench_render_list_mostly_culled(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_hit_test(c: &mut Criterion) {
+    let g = build_mixed_grid(1_000);
+    // A point in the middle of the grid
+    c.bench_function("scene_graph::hit_test_1000", |b| {
+        b.iter(|| black_box(g.hit_test(500.0, 500.0)));
+    });
+}
+
 criterion_group!(
     benches,
     bench_version,

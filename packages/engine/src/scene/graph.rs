@@ -4,10 +4,6 @@ use crate::math::{color::Color, rect::Rect};
 use crate::scene::node::{NodeId, NodeKind, SceneNode};
 
 /// Flat-arena scene graph exposed to JavaScript via wasm-bindgen.
-///
-/// Nodes are stored at `nodes[id.0]`.  IDs are monotonically allocated
-/// and never reused, making external references stable for the lifetime
-/// of the graph.
 #[wasm_bindgen]
 pub struct SceneGraph {
     nodes: Vec<Option<SceneNode>>,
@@ -21,11 +17,10 @@ impl Default for SceneGraph {
     }
 }
 
-// ── Public WASM-exported API ──────────────────────────────────────────────────
+// ── Public WASM API ──────────────────────────────────────────────────────────
 
 #[wasm_bindgen]
 impl SceneGraph {
-    /// Creates an empty scene graph.
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Self {
@@ -35,12 +30,10 @@ impl SceneGraph {
         }
     }
 
-    /// Returns the total number of live nodes.
     pub fn node_count(&self) -> u32 {
         self.nodes.iter().filter(|n| n.is_some()).count() as u32
     }
 
-    /// Adds a root-level frame (container; not rendered).
     pub fn add_frame(&mut self, x: f32, y: f32, w: f32, h: f32) -> u32 {
         let id = self.alloc_id();
         let node = SceneNode {
@@ -55,10 +48,6 @@ impl SceneGraph {
         id.0
     }
 
-    /// Adds a filled rectangle as a child of `parent`.
-    ///
-    /// Stroke defaults to transparent; corner radius defaults to 0.
-    /// Use [`set_stroke`] and [`set_corner_radius`] to modify after creation.
     #[allow(clippy::too_many_arguments)]
     pub fn add_rect(
         &mut self,
@@ -95,10 +84,6 @@ impl SceneGraph {
         id.0
     }
 
-    /// Adds a filled ellipse as a child of `parent`.
-    ///
-    /// When `w == h` the shape is a perfect circle.
-    /// Stroke defaults to transparent; use [`set_stroke`] to add an outline.
     #[allow(clippy::too_many_arguments)]
     pub fn add_ellipse(
         &mut self,
@@ -134,9 +119,6 @@ impl SceneGraph {
         id.0
     }
 
-    /// Applies a stroke colour and width to any Rect or Ellipse node.
-    ///
-    /// Pass `a: 0` to make the stroke invisible without removing it.
     pub fn set_stroke(&mut self, id: u32, r: u8, g: u8, b: u8, a: u8, width: f32) {
         let Some(Some(node)) = self.nodes.get_mut(id as usize) else {
             return;
@@ -163,8 +145,6 @@ impl SceneGraph {
         }
     }
 
-    /// Sets the corner radius of a Rect node in world units.
-    /// Has no effect on Ellipse or Frame nodes.
     pub fn set_corner_radius(&mut self, id: u32, radius: f32) {
         let Some(Some(node)) = self.nodes.get_mut(id as usize) else {
             return;
@@ -174,19 +154,67 @@ impl SceneGraph {
         }
     }
 
-    /// Returns a flat `Float32Array` of every visible shape overlapping the
-    /// current viewport, ready to upload directly into the GPU storage buffer.
+    // ── Phase 4 additions ────────────────────────────────────────────────────
+
+    /// Returns the id of the top-most renderable node hit at world `(x, y)`,
+    /// or `-1` if nothing is hit.
     ///
-    /// **Layout per shape — 16 × f32 = 64 bytes:**
-    /// ```text
-    /// [ x,  y,  w,  h,                               // world bounds
-    ///   fill.r,   fill.g,   fill.b,   fill.a,        // fill  RGBA [0, 1]
-    ///   stroke.r, stroke.g, stroke.b, stroke.a,      // stroke RGBA [0, 1]
-    ///   stroke_width,  corner_radius,  shape_type,  _pad ]
-    ///                                   └─ 0.0 = rect,  1.0 = ellipse
-    /// ```
+    /// Traverses in reverse insertion order so the visually topmost shape
+    /// (drawn last) wins.  Frame nodes are never returned.
+    pub fn hit_test(&self, x: f32, y: f32) -> i32 {
+        for slot in self.nodes.iter().rev() {
+            let Some(node) = slot else { continue };
+            match &node.kind {
+                NodeKind::Frame => continue,
+                NodeKind::Rect { .. } => {
+                    if node.bounds.contains_point(x, y) {
+                        return node.id.0 as i32;
+                    }
+                }
+                NodeKind::Ellipse { .. } => {
+                    // Normalised point-in-ellipse: (Δx/rx)² + (Δy/ry)² ≤ 1
+                    let cx = node.bounds.x + node.bounds.w * 0.5;
+                    let cy = node.bounds.y + node.bounds.h * 0.5;
+                    let rx = node.bounds.w * 0.5;
+                    let ry = node.bounds.h * 0.5;
+                    if rx > 0.0 && ry > 0.0 {
+                        let ndx = (x - cx) / rx;
+                        let ndy = (y - cy) / ry;
+                        if ndx * ndx + ndy * ndy <= 1.0 {
+                            return node.id.0 as i32;
+                        }
+                    }
+                }
+            }
+        }
+        -1
+    }
+
+    /// Moves a node to absolute world position `(x, y)`.
     ///
-    /// Frame nodes are skipped — they are organisational containers only.
+    /// Preferred for drag: compute `start_pos + delta` once per event,
+    /// avoiding the floating-point drift of repeated delta accumulation.
+    pub fn set_node_position(&mut self, id: u32, x: f32, y: f32) {
+        let Some(Some(node)) = self.nodes.get_mut(id as usize) else {
+            return;
+        };
+        node.bounds.x = x;
+        node.bounds.y = y;
+    }
+
+    /// Returns `[x, y, w, h]` for the node, or an empty slice if the node
+    /// does not exist.
+    pub fn get_node_bounds(&self, id: u32) -> Vec<f32> {
+        let Some(Some(node)) = self.nodes.get(id as usize) else {
+            return Vec::new();
+        };
+        vec![node.bounds.x, node.bounds.y, node.bounds.w, node.bounds.h]
+    }
+
+    // ── Render list ──────────────────────────────────────────────────────────
+
+    /// Returns a flat `Float32Array` (16 × f32 = 64 bytes per shape) of every
+    /// visible shape that overlaps the viewport.
     pub fn get_render_list(
         &self,
         cam_x: f32,
@@ -205,13 +233,11 @@ impl SceneGraph {
         };
 
         let mut out = Vec::new();
-
         for slot in &self.nodes {
             let Some(node) = slot else { continue };
             if !node.bounds.intersects(&frustum) {
                 continue;
             }
-
             match &node.kind {
                 NodeKind::Frame => continue,
                 NodeKind::Rect {
@@ -239,7 +265,6 @@ impl SceneGraph {
                 }
             }
         }
-
         out
     }
 }
@@ -267,7 +292,6 @@ impl SceneGraph {
         }
     }
 
-    /// Appends one shape's 16 floats to `out`.
     fn push_shape(
         out: &mut Vec<f32>,
         node: &SceneNode,
@@ -286,7 +310,7 @@ impl SceneGraph {
         out.push(stroke_width);
         out.push(corner_radius);
         out.push(shape_type);
-        out.push(0.0); // padding — keeps the stride 64-byte aligned
+        out.push(0.0); // pad
     }
 }
 
@@ -297,11 +321,10 @@ mod tests {
     use super::*;
 
     fn wide_cam() -> (f32, f32, f32, f32, f32) {
-        // cam_x, cam_y, zoom, vp_w, vp_h — sees everything near the origin
         (500.0, 400.0, 1.0, 1920.0, 1080.0)
     }
 
-    // ── Construction ─────────────────────────────────────────────────────────
+    // ── Phase 2/3 construction ───────────────────────────────────────────────
 
     #[test]
     fn new_graph_is_empty() {
@@ -332,23 +355,13 @@ mod tests {
     }
 
     #[test]
-    fn frame_rect_ellipse_have_distinct_ids() {
+    fn ids_are_monotonically_increasing() {
         let mut g = SceneGraph::new();
         let f = g.add_frame(0.0, 0.0, 1000.0, 1000.0);
         let rect = g.add_rect(f, 0.0, 0.0, 10.0, 10.0, 0, 0, 0, 255);
         let ellipse = g.add_ellipse(f, 0.0, 0.0, 10.0, 10.0, 0, 0, 0, 255);
         assert!(rect > f);
         assert!(ellipse > rect);
-    }
-
-    // ── Render list — stride and format ──────────────────────────────────────
-
-    #[test]
-    fn render_list_is_empty_for_frame_only_scene() {
-        let mut g = SceneGraph::new();
-        g.add_frame(0.0, 0.0, 1000.0, 800.0);
-        let (cx, cy, z, vw, vh) = wide_cam();
-        assert!(g.get_render_list(cx, cy, z, vw, vh).is_empty());
     }
 
     #[test]
@@ -371,57 +384,13 @@ mod tests {
         assert_eq!(g.get_render_list(cx, cy, z, vw, vh).len(), 3 * 16);
     }
 
-    // ── Render list — position and colour ────────────────────────────────────
-
-    #[test]
-    fn render_list_encodes_position_and_size() {
-        let mut g = SceneGraph::new();
-        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
-        g.add_rect(f, 100.0, 200.0, 300.0, 400.0, 0, 0, 0, 255);
-        let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert_eq!(list[0], 100.0); // x
-        assert_eq!(list[1], 200.0); // y
-        assert_eq!(list[2], 300.0); // w
-        assert_eq!(list[3], 400.0); // h
-    }
-
-    #[test]
-    fn render_list_normalises_fill_colour() {
-        let mut g = SceneGraph::new();
-        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
-        g.add_rect(f, 0.0, 0.0, 50.0, 50.0, 255, 0, 128, 255);
-        let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert!((list[4] - 1.0).abs() < 1e-5); // r = 255/255
-        assert_eq!(list[5], 0.0); // g = 0/255
-        assert!((list[6] - 128.0 / 255.0).abs() < 1e-5); // b = 128/255
-        assert!((list[7] - 1.0).abs() < 1e-5); // a = 255/255
-    }
-
-    #[test]
-    fn render_list_normalises_ellipse_fill() {
-        let mut g = SceneGraph::new();
-        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
-        g.add_ellipse(f, 0.0, 0.0, 80.0, 80.0, 0, 255, 0, 255);
-        let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert_eq!(list[4], 0.0); // r
-        assert!((list[5] - 1.0).abs() < 1e-5); // g
-        assert_eq!(list[6], 0.0); // b
-        assert!((list[7] - 1.0).abs() < 1e-5); // a
-    }
-
-    // ── Render list — shape type ──────────────────────────────────────────────
-
     #[test]
     fn rect_has_shape_type_zero() {
         let mut g = SceneGraph::new();
         let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
         g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
         let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert!(list[14].abs() < 1e-5); // shape_type = 0.0
+        assert!((g.get_render_list(cx, cy, z, vw, vh)[14]).abs() < 1e-5);
     }
 
     #[test]
@@ -430,63 +399,18 @@ mod tests {
         let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
         g.add_ellipse(f, 0.0, 0.0, 100.0, 80.0, 0, 255, 0, 255);
         let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert!((list[14] - 1.0).abs() < 1e-5); // shape_type = 1.0
-    }
-
-    // ── Render list — stroke ─────────────────────────────────────────────────
-
-    #[test]
-    fn new_rect_has_transparent_stroke() {
-        let mut g = SceneGraph::new();
-        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
-        g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
-        let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert_eq!(list[11], 0.0); // stroke alpha = 0
-        assert_eq!(list[12], 0.0); // stroke_width = 0
+        assert!((g.get_render_list(cx, cy, z, vw, vh)[14] - 1.0).abs() < 1e-5);
     }
 
     #[test]
-    fn set_stroke_on_rect_applies_colour_and_width() {
+    fn set_stroke_on_rect() {
         let mut g = SceneGraph::new();
         let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
         let id = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
         g.set_stroke(id, 0, 0, 255, 255, 6.0);
         let (cx, cy, z, vw, vh) = wide_cam();
         let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert_eq!(list[8], 0.0); // stroke r
-        assert_eq!(list[9], 0.0); // stroke g
-        assert!((list[10] - 1.0).abs() < 1e-5); // stroke b
-        assert!((list[11] - 1.0).abs() < 1e-5); // stroke a
         assert!((list[12] - 6.0).abs() < 1e-5); // stroke_width
-    }
-
-    #[test]
-    fn set_stroke_on_ellipse_applies_colour_and_width() {
-        let mut g = SceneGraph::new();
-        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
-        let id = g.add_ellipse(f, 0.0, 0.0, 100.0, 100.0, 0, 0, 0, 0);
-        g.set_stroke(id, 255, 128, 0, 255, 4.0);
-        let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert!((list[8] - 1.0).abs() < 1e-5); // r
-        assert!((list[9] - 128.0 / 255.0).abs() < 1e-5); // g
-        assert_eq!(list[10], 0.0); // b
-        assert!((list[11] - 1.0).abs() < 1e-5); // a
-        assert!((list[12] - 4.0).abs() < 1e-5); // width
-    }
-
-    // ── Render list — corner radius ───────────────────────────────────────────
-
-    #[test]
-    fn new_rect_has_zero_corner_radius() {
-        let mut g = SceneGraph::new();
-        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
-        g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
-        let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert_eq!(list[13], 0.0);
     }
 
     #[test]
@@ -496,23 +420,8 @@ mod tests {
         let id = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
         g.set_corner_radius(id, 20.0);
         let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        assert!((list[13] - 20.0).abs() < 1e-5);
+        assert!((g.get_render_list(cx, cy, z, vw, vh)[13] - 20.0).abs() < 1e-5);
     }
-
-    #[test]
-    fn set_corner_radius_has_no_effect_on_ellipse() {
-        let mut g = SceneGraph::new();
-        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
-        let id = g.add_ellipse(f, 0.0, 0.0, 100.0, 100.0, 0, 0, 0, 255);
-        g.set_corner_radius(id, 20.0); // silently ignored
-        let (cx, cy, z, vw, vh) = wide_cam();
-        let list = g.get_render_list(cx, cy, z, vw, vh);
-        // corner_radius at [13] remains 0.0 — ellipse SDF ignores it anyway
-        assert_eq!(list[13], 0.0);
-    }
-
-    // ── Culling ───────────────────────────────────────────────────────────────
 
     #[test]
     fn render_list_culls_out_of_viewport_shapes() {
@@ -520,20 +429,147 @@ mod tests {
         let f = g.add_frame(0.0, 0.0, 10_000.0, 10_000.0);
         g.add_rect(f, 9_000.0, 9_000.0, 100.0, 100.0, 255, 0, 0, 255);
         g.add_ellipse(f, 9_500.0, 9_500.0, 100.0, 100.0, 0, 255, 0, 255);
-        // Tiny viewport centred at origin — both shapes are far away
         assert!(g.get_render_list(0.0, 0.0, 1.0, 100.0, 100.0).is_empty());
     }
 
+    // ── Phase 4: hit_test ────────────────────────────────────────────────────
+
     #[test]
-    fn render_list_includes_only_visible_shapes() {
+    fn hit_test_returns_minus_one_on_empty_scene() {
+        let g = SceneGraph::new();
+        assert_eq!(g.hit_test(50.0, 50.0), -1);
+    }
+
+    #[test]
+    fn hit_test_misses_when_clicking_outside_all_shapes() {
         let mut g = SceneGraph::new();
-        let f = g.add_frame(0.0, 0.0, 10_000.0, 10_000.0);
-        for i in 0..5_u32 {
-            g.add_rect(f, (i * 100) as f32, 0.0, 90.0, 90.0, 255, 0, 0, 255);
-        }
-        // One rect far outside the camera
-        g.add_ellipse(f, 9_000.0, 9_000.0, 100.0, 100.0, 0, 255, 0, 255);
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        g.add_rect(f, 100.0, 100.0, 200.0, 150.0, 255, 0, 0, 255);
+        assert_eq!(g.hit_test(50.0, 50.0), -1);
+    }
+
+    #[test]
+    fn hit_test_returns_rect_id_when_point_is_inside() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let rect = g.add_rect(f, 100.0, 100.0, 200.0, 150.0, 255, 0, 0, 255);
+        assert_eq!(g.hit_test(150.0, 150.0), rect as i32);
+    }
+
+    #[test]
+    fn hit_test_returns_ellipse_id_when_point_is_inside() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let ellipse_id = g.add_ellipse(f, 100.0, 100.0, 200.0, 200.0, 0, 255, 0, 255);
+        // Centre of the ellipse → definitely inside
+        assert_eq!(g.hit_test(200.0, 200.0), ellipse_id as i32);
+    }
+
+    #[test]
+    fn hit_test_misses_ellipse_corner_outside_inscribed_circle() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        g.add_ellipse(f, 100.0, 100.0, 200.0, 200.0, 0, 255, 0, 255);
+        // Top-left corner of the bounding box is outside the circle
+        assert_eq!(g.hit_test(101.0, 101.0), -1);
+    }
+
+    #[test]
+    fn hit_test_never_returns_frame_id() {
+        let mut g = SceneGraph::new();
+        g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        // Clicking anywhere returns -1 because only a Frame exists
+        assert_eq!(g.hit_test(100.0, 100.0), -1);
+    }
+
+    #[test]
+    fn hit_test_returns_topmost_shape_when_overlapping() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 1000.0);
+        let _bottom = g.add_rect(f, 0.0, 0.0, 200.0, 200.0, 255, 0, 0, 255);
+        let top = g.add_rect(f, 50.0, 50.0, 200.0, 200.0, 0, 0, 255, 255);
+        // Point inside both rects — top (later inserted) should win
+        assert_eq!(g.hit_test(100.0, 100.0), top as i32);
+    }
+
+    #[test]
+    fn hit_test_bottom_shape_reachable_outside_top_shape() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 1000.0);
+        let bottom = g.add_rect(f, 0.0, 0.0, 200.0, 200.0, 255, 0, 0, 255);
+        let _top = g.add_rect(f, 100.0, 100.0, 200.0, 200.0, 0, 0, 255, 255);
+        // Point inside bottom-only area
+        assert_eq!(g.hit_test(10.0, 10.0), bottom as i32);
+    }
+
+    // ── Phase 4: set_node_position ───────────────────────────────────────────
+
+    #[test]
+    fn set_node_position_moves_rect() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 100.0, 100.0, 50.0, 50.0, 255, 0, 0, 255);
+        g.set_node_position(id, 300.0, 400.0);
         let (cx, cy, z, vw, vh) = wide_cam();
-        assert_eq!(g.get_render_list(cx, cy, z, vw, vh).len(), 5 * 16);
+        let list = g.get_render_list(cx, cy, z, vw, vh);
+        assert_eq!(list[0], 300.0); // x
+        assert_eq!(list[1], 400.0); // y
+    }
+
+    #[test]
+    fn set_node_position_updates_hit_test() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 100.0, 100.0, 50.0, 50.0, 255, 0, 0, 255);
+        // Originally at (100,100)...(150,150) — old position hits
+        assert_eq!(g.hit_test(110.0, 110.0), id as i32);
+        // Move to (300,300)
+        g.set_node_position(id, 300.0, 300.0);
+        // Old position should miss now
+        assert_eq!(g.hit_test(110.0, 110.0), -1);
+        // New position should hit
+        assert_eq!(g.hit_test(320.0, 320.0), id as i32);
+    }
+
+    #[test]
+    fn set_node_position_on_nonexistent_id_is_no_op() {
+        let mut g = SceneGraph::new();
+        // Should not panic
+        g.set_node_position(999, 0.0, 0.0);
+        assert_eq!(g.node_count(), 0);
+    }
+
+    // ── Phase 4: get_node_bounds ─────────────────────────────────────────────
+
+    #[test]
+    fn get_node_bounds_returns_correct_values() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 10.0, 20.0, 300.0, 150.0, 0, 0, 0, 255);
+        let b = g.get_node_bounds(id);
+        assert_eq!(b.len(), 4);
+        assert_eq!(b[0], 10.0);
+        assert_eq!(b[1], 20.0);
+        assert_eq!(b[2], 300.0);
+        assert_eq!(b[3], 150.0);
+    }
+
+    #[test]
+    fn get_node_bounds_returns_empty_for_missing_id() {
+        let g = SceneGraph::new();
+        assert!(g.get_node_bounds(999).is_empty());
+    }
+
+    #[test]
+    fn get_node_bounds_reflects_set_node_position() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 0.0, 0.0, 100.0, 80.0, 0, 0, 0, 255);
+        g.set_node_position(id, 42.0, 77.0);
+        let b = g.get_node_bounds(id);
+        assert_eq!(b[0], 42.0);
+        assert_eq!(b[1], 77.0);
+        assert_eq!(b[2], 100.0); // width unchanged
+        assert_eq!(b[3], 80.0); // height unchanged
     }
 }

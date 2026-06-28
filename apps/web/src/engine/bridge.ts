@@ -1,20 +1,24 @@
 /**
- * EngineWorkerBridge
+ * EngineWorkerBridge — Phase 4
  *
- * Main-thread façade for the engine Web Worker.
- * Handles Worker lifecycle, message routing, and FPS tracking.
+ * Additions:
+ *   - onSelectionChanged / onViewportChanged events
+ *   - setTool, sendPointerDown/Move/Up, sendWheel, sendKeyDown methods
  */
 
-import type { EngineToMainMessage, MainToEngineMessage } from "@graphite/protocol";
+import type {
+  EngineToMainMessage,
+  MainToEngineMessage,
+  ToolType,
+  PointerModifiers,
+  KeyboardModifiers,
+} from "@graphite/protocol";
 
-// ─── Public types ────────────────────────────────────────────────────────────
+// ─── Public types ─────────────────────────────────────────────────────────────
 
 export interface EngineStats {
-  /** Monotonically increasing frame index reported by the worker. */
   frameNumber: number;
-  /** GPU encode + submit time for the last frame (milliseconds). */
   renderTimeMs: number;
-  /** Frames rendered in the last second (0 until the first full second). */
   fps: number;
 }
 
@@ -22,15 +26,16 @@ export interface EngineBridgeEvents {
   onReady: () => void;
   onStats: (stats: EngineStats) => void;
   onError: (message: string) => void;
+  onSelectionChanged: (nodeIds: readonly string[]) => void;
+  onViewportChanged: (x: number, y: number, zoom: number) => void;
 }
 
-// ─── Class ───────────────────────────────────────────────────────────────────
+// ─── Class ────────────────────────────────────────────────────────────────────
 
 export class EngineWorkerBridge {
   private readonly worker: Worker;
   private readonly handlers: Partial<EngineBridgeEvents> = {};
   private initialized = false;
-
   private frameCount = 0;
   private fpsWindowStart = performance.now();
   private currentFps = 0;
@@ -52,22 +57,11 @@ export class EngineWorkerBridge {
     return this;
   }
 
-  /**
-   * Transfer the canvas to the worker and begin rendering.
-   *
-   * canvas.width and canvas.height are NOT touched here: writing those
-   * properties after transferControlToOffscreen() throws InvalidStateError.
-   * The correct physical-pixel dimensions are sent immediately as an
-   * engine:resize message so the worker can apply them on the OffscreenCanvas
-   * before the first frame is drawn.
-   */
   init(canvas: HTMLCanvasElement): void {
     if (this.initialized) return;
     this.initialized = true;
-
     const dpr = window.devicePixelRatio;
     const rect = canvas.getBoundingClientRect();
-
     const offscreen = canvas.transferControlToOffscreen();
     const initMsg: MainToEngineMessage = {
       type: "engine:init",
@@ -75,9 +69,6 @@ export class EngineWorkerBridge {
       devicePixelRatio: dpr,
     };
     this.worker.postMessage(initMsg, [offscreen]);
-
-    // Forward correct physical-pixel dimensions to the worker.
-    // The worker will set these on the OffscreenCanvas before the first render.
     this.resize(rect.width, rect.height);
   }
 
@@ -97,6 +88,53 @@ export class EngineWorkerBridge {
     this.initialized = false;
     this.worker.terminate();
   }
+
+  // ── Interaction ───────────────────────────────────────────────────────────
+
+  setTool(tool: ToolType): void {
+    const msg: MainToEngineMessage = { type: "tool:set", tool };
+    this.worker.postMessage(msg);
+  }
+
+  sendPointerDown(x: number, y: number, button: number, modifiers: PointerModifiers): void {
+    const msg: MainToEngineMessage = { type: "pointer:down", x, y, button, modifiers };
+    this.worker.postMessage(msg);
+  }
+
+  sendPointerMove(x: number, y: number, modifiers: PointerModifiers): void {
+    const msg: MainToEngineMessage = { type: "pointer:move", x, y, modifiers };
+    this.worker.postMessage(msg);
+  }
+
+  sendPointerUp(x: number, y: number, button: number, modifiers: PointerModifiers): void {
+    const msg: MainToEngineMessage = { type: "pointer:up", x, y, button, modifiers };
+    this.worker.postMessage(msg);
+  }
+
+  sendWheel(
+    deltaX: number,
+    deltaY: number,
+    x: number,
+    y: number,
+    modifiers: PointerModifiers
+  ): void {
+    const msg: MainToEngineMessage = {
+      type: "wheel:scroll",
+      deltaX,
+      deltaY,
+      x,
+      y,
+      modifiers,
+    };
+    this.worker.postMessage(msg);
+  }
+
+  sendKeyDown(key: string, modifiers: KeyboardModifiers): void {
+    const msg: MainToEngineMessage = { type: "key:down", key, modifiers };
+    this.worker.postMessage(msg);
+  }
+
+  // ── Incoming messages ─────────────────────────────────────────────────────
 
   private handleWorkerMessage(msg: EngineToMainMessage): void {
     switch (msg.type) {
@@ -122,6 +160,14 @@ export class EngineWorkerBridge {
       }
       case "engine:error": {
         this.handlers.onError?.(msg.message);
+        break;
+      }
+      case "selection:changed": {
+        this.handlers.onSelectionChanged?.(msg.nodeIds as readonly string[]);
+        break;
+      }
+      case "viewport:changed": {
+        this.handlers.onViewportChanged?.(msg.x, msg.y, msg.zoom);
         break;
       }
       default:
