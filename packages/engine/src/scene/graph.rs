@@ -4,11 +4,26 @@ use crate::math::{color::Color, rect::Rect};
 use crate::scene::node::{NodeId, NodeKind, SceneNode};
 
 /// Flat-arena scene graph exposed to JavaScript via wasm-bindgen.
+///
+/// `count` is maintained incrementally rather than computed by scanning
+/// `nodes` on every call, since `node_count()` is part of the public API
+/// and a future caller may reasonably call it once per frame.
+///
+/// Root-level recursive traversal (parent → children rendering order) is
+/// deferred until a feature actually needs it — e.g. the Phase 6+ layers
+/// panel, where re-parenting and explicit z-order become real operations.
+/// Until then, z-order is simply arena insertion order, which is what
+/// `get_render_list` and `hit_test` already use and what the existing test
+/// suite (`hit_test_returns_topmost_shape_when_overlapping`) encodes as the
+/// contract. A `roots` field previously existed here but was write-only —
+/// populated by `add_frame`, never read — so it has been removed rather
+/// than carried as dead weight that misleads future contributors into
+/// thinking it drives traversal order.
 #[wasm_bindgen]
 pub struct SceneGraph {
     nodes: Vec<Option<SceneNode>>,
-    roots: Vec<NodeId>,
     next_id: u32,
+    count: u32,
 }
 
 impl Default for SceneGraph {
@@ -25,13 +40,14 @@ impl SceneGraph {
     pub fn new() -> Self {
         Self {
             nodes: Vec::new(),
-            roots: Vec::new(),
             next_id: 0,
+            count: 0,
         }
     }
 
+    /// Returns the number of live nodes. O(1) — maintained incrementally.
     pub fn node_count(&self) -> u32 {
-        self.nodes.iter().filter(|n| n.is_some()).count() as u32
+        self.count
     }
 
     pub fn add_frame(&mut self, x: f32, y: f32, w: f32, h: f32) -> u32 {
@@ -44,7 +60,6 @@ impl SceneGraph {
             children: Vec::new(),
         };
         self.store(node);
-        self.roots.push(id);
         id.0
     }
 
@@ -157,18 +172,23 @@ impl SceneGraph {
     // ── Phase 4 additions ────────────────────────────────────────────────────
 
     /// Returns the id of the top-most renderable node hit at world `(x, y)`,
-    /// or `-1` if nothing is hit.
+    /// or `None` if nothing is hit.
     ///
     /// Traverses in reverse insertion order so the visually topmost shape
     /// (drawn last) wins.  Frame nodes are never returned.
-    pub fn hit_test(&self, x: f32, y: f32) -> i32 {
+    ///
+    /// Returns `Option<u32>` rather than a signed sentinel: `wasm-bindgen`
+    /// maps this directly to `number | undefined` in TypeScript, so a miss
+    /// is `undefined` instead of a magic `-1` that every call site has to
+    /// remember to check for.
+    pub fn hit_test(&self, x: f32, y: f32) -> Option<u32> {
         for slot in self.nodes.iter().rev() {
             let Some(node) = slot else { continue };
             match &node.kind {
                 NodeKind::Frame => continue,
                 NodeKind::Rect { .. } => {
                     if node.bounds.contains_point(x, y) {
-                        return node.id.0 as i32;
+                        return Some(node.id.0);
                     }
                 }
                 NodeKind::Ellipse { .. } => {
@@ -181,13 +201,13 @@ impl SceneGraph {
                         let ndx = (x - cx) / rx;
                         let ndy = (y - cy) / ry;
                         if ndx * ndx + ndy * ndy <= 1.0 {
-                            return node.id.0 as i32;
+                            return Some(node.id.0);
                         }
                     }
                 }
             }
         }
-        -1
+        None
     }
 
     /// Moves a node to absolute world position `(x, y)`.
@@ -284,6 +304,7 @@ impl SceneGraph {
             self.nodes.resize_with(idx + 1, || None);
         }
         self.nodes[idx] = Some(node);
+        self.count += 1;
     }
 
     fn link_child(&mut self, parent_id: u32, child_id: NodeId) {
@@ -435,9 +456,9 @@ mod tests {
     // ── Phase 4: hit_test ────────────────────────────────────────────────────
 
     #[test]
-    fn hit_test_returns_minus_one_on_empty_scene() {
+    fn hit_test_returns_none_on_empty_scene() {
         let g = SceneGraph::new();
-        assert_eq!(g.hit_test(50.0, 50.0), -1);
+        assert_eq!(g.hit_test(50.0, 50.0), None);
     }
 
     #[test]
@@ -445,7 +466,7 @@ mod tests {
         let mut g = SceneGraph::new();
         let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
         g.add_rect(f, 100.0, 100.0, 200.0, 150.0, 255, 0, 0, 255);
-        assert_eq!(g.hit_test(50.0, 50.0), -1);
+        assert_eq!(g.hit_test(50.0, 50.0), None);
     }
 
     #[test]
@@ -453,7 +474,7 @@ mod tests {
         let mut g = SceneGraph::new();
         let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
         let rect = g.add_rect(f, 100.0, 100.0, 200.0, 150.0, 255, 0, 0, 255);
-        assert_eq!(g.hit_test(150.0, 150.0), rect as i32);
+        assert_eq!(g.hit_test(150.0, 150.0), Some(rect));
     }
 
     #[test]
@@ -462,7 +483,7 @@ mod tests {
         let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
         let ellipse_id = g.add_ellipse(f, 100.0, 100.0, 200.0, 200.0, 0, 255, 0, 255);
         // Centre of the ellipse → definitely inside
-        assert_eq!(g.hit_test(200.0, 200.0), ellipse_id as i32);
+        assert_eq!(g.hit_test(200.0, 200.0), Some(ellipse_id));
     }
 
     #[test]
@@ -471,15 +492,15 @@ mod tests {
         let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
         g.add_ellipse(f, 100.0, 100.0, 200.0, 200.0, 0, 255, 0, 255);
         // Top-left corner of the bounding box is outside the circle
-        assert_eq!(g.hit_test(101.0, 101.0), -1);
+        assert_eq!(g.hit_test(101.0, 101.0), None);
     }
 
     #[test]
     fn hit_test_never_returns_frame_id() {
         let mut g = SceneGraph::new();
         g.add_frame(0.0, 0.0, 1000.0, 800.0);
-        // Clicking anywhere returns -1 because only a Frame exists
-        assert_eq!(g.hit_test(100.0, 100.0), -1);
+        // Clicking anywhere returns None because only a Frame exists
+        assert_eq!(g.hit_test(100.0, 100.0), None);
     }
 
     #[test]
@@ -489,7 +510,7 @@ mod tests {
         let _bottom = g.add_rect(f, 0.0, 0.0, 200.0, 200.0, 255, 0, 0, 255);
         let top = g.add_rect(f, 50.0, 50.0, 200.0, 200.0, 0, 0, 255, 255);
         // Point inside both rects — top (later inserted) should win
-        assert_eq!(g.hit_test(100.0, 100.0), top as i32);
+        assert_eq!(g.hit_test(100.0, 100.0), Some(top));
     }
 
     #[test]
@@ -499,7 +520,7 @@ mod tests {
         let bottom = g.add_rect(f, 0.0, 0.0, 200.0, 200.0, 255, 0, 0, 255);
         let _top = g.add_rect(f, 100.0, 100.0, 200.0, 200.0, 0, 0, 255, 255);
         // Point inside bottom-only area
-        assert_eq!(g.hit_test(10.0, 10.0), bottom as i32);
+        assert_eq!(g.hit_test(10.0, 10.0), Some(bottom));
     }
 
     // ── Phase 4: set_node_position ───────────────────────────────────────────
@@ -522,13 +543,13 @@ mod tests {
         let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
         let id = g.add_rect(f, 100.0, 100.0, 50.0, 50.0, 255, 0, 0, 255);
         // Originally at (100,100)...(150,150) — old position hits
-        assert_eq!(g.hit_test(110.0, 110.0), id as i32);
+        assert_eq!(g.hit_test(110.0, 110.0), Some(id));
         // Move to (300,300)
         g.set_node_position(id, 300.0, 300.0);
         // Old position should miss now
-        assert_eq!(g.hit_test(110.0, 110.0), -1);
+        assert_eq!(g.hit_test(110.0, 110.0), None);
         // New position should hit
-        assert_eq!(g.hit_test(320.0, 320.0), id as i32);
+        assert_eq!(g.hit_test(320.0, 320.0), Some(id));
     }
 
     #[test]

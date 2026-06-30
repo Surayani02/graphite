@@ -11,6 +11,7 @@ import {
   MIN_ZOOM,
   MAX_ZOOM,
   DEFAULT_ZOOM,
+  DEFAULT_CAMERA,
   TARGET_FPS,
   FRAME_BUDGET_MS,
   MVP_MAX_OBJECTS,
@@ -123,17 +124,51 @@ describe("IDENTITY_TRANSFORM", () => {
 
 describe("Colors", () => {
   it("COLOR_BLACK has correct channel values", () => {
-    expect(COLOR_BLACK).toEqual({ r: 0, g: 0, b: 0, a: 1 });
+    expect(COLOR_BLACK).toEqual({ r: 0, g: 0, b: 0, a: 255 });
     expect(Object.isFrozen(COLOR_BLACK)).toBe(true);
   });
 
   it("COLOR_WHITE has correct channel values", () => {
-    expect(COLOR_WHITE).toEqual({ r: 1, g: 1, b: 1, a: 1 });
+    expect(COLOR_WHITE).toEqual({ r: 255, g: 255, b: 255, a: 255 });
   });
 
   it("COLOR_TRANSPARENT has zero alpha", () => {
     expect(COLOR_TRANSPARENT.a).toBe(0);
     expect(Object.isFrozen(COLOR_TRANSPARENT)).toBe(true);
+  });
+
+  // Semantic correctness, not just "whatever the constant currently equals" —
+  // this is the test that would have caught BUG-01 before it shipped.
+  it("COLOR_BLACK is fully opaque", () => {
+    expect(COLOR_BLACK.a).toBe(255);
+  });
+
+  it("COLOR_WHITE is fully opaque", () => {
+    expect(COLOR_WHITE.a).toBe(255);
+  });
+
+  it("all channels of every exported constant are within [0, 255]", () => {
+    for (const c of [COLOR_BLACK, COLOR_WHITE, COLOR_TRANSPARENT]) {
+      for (const channel of [c.r, c.g, c.b, c.a]) {
+        expect(channel).toBeGreaterThanOrEqual(0);
+        expect(channel).toBeLessThanOrEqual(255);
+      }
+    }
+  });
+});
+
+describe("DEFAULT_CAMERA", () => {
+  it("is frozen", () => {
+    expect(Object.isFrozen(DEFAULT_CAMERA)).toBe(true);
+  });
+
+  it("has a positive zoom", () => {
+    expect(DEFAULT_CAMERA.zoom).toBeGreaterThan(0);
+  });
+
+  it("zoom is within the valid MIN_ZOOM..MAX_ZOOM range", () => {
+    expect(DEFAULT_CAMERA.zoom).toBeGreaterThanOrEqual(MIN_ZOOM);
+    expect(DEFAULT_CAMERA.zoom).toBeLessThanOrEqual(MAX_ZOOM);
   });
 });
 

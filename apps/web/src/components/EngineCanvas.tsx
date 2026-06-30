@@ -1,16 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEngine } from "../hooks/useEngine";
 import type { ToolType, PointerModifiers } from "@graphite/protocol";
+import { ToolBar } from "./ToolBar";
+import { StatsHUD } from "./StatsHUD";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getPointerMods(e: React.PointerEvent | PointerEvent | WheelEvent): PointerModifiers {
-  return {
-    shift: e.shiftKey,
-    ctrl: e.ctrlKey,
-    alt: e.altKey,
-    meta: e.metaKey,
-  };
+function getPointerMods(e: PointerEvent | WheelEvent): PointerModifiers {
+  return { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey };
+}
+
+/**
+ * QUAL-10: the previous guard only excluded `HTMLInputElement` and
+ * `HTMLTextAreaElement`, so typing "v" into a `contenteditable` element
+ * (e.g. a future inline rename field, comment box, or text-tool overlay)
+ * would still trigger the "switch to select tool" shortcut. `isContentEditable`
+ * covers every editable surface generically, including ones added later,
+ * without needing this list updated per new component.
+ *
+ * Listeners stay on `window` rather than being scoped to a focused wrapper
+ * element (the literal fix suggested by the static-analysis report): for a
+ * design tool, keyboard shortcuts are expected to work regardless of which
+ * panel currently has DOM focus (this is how Figma, Linear, and Sketch all
+ * behave) — scoping to focus would silently break shortcuts the moment
+ * focus lands somewhere unexpected, which is a worse failure mode than the
+ * narrow gap being closed here.
+ */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target.isContentEditable
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -25,12 +47,14 @@ export function EngineCanvas() {
     error,
     selectedIds,
     viewport,
+    lastSaved,
     setTool: bridgeSetTool,
     sendPointerDown,
     sendPointerMove,
     sendPointerUp,
     sendWheel,
     sendKeyDown,
+    requestSave,
   } = useEngine();
 
   // ── Local UI state ─────────────────────────────────────────────────────────
@@ -39,7 +63,6 @@ export function EngineCanvas() {
   const [spaceDown, setSpaceDown] = useState(false);
   const [isPointerDown, setPointerDown] = useState(false);
 
-  // Refs keep keyboard handlers stable without re-creating them on state changes
   const toolRef = useRef<ToolType>("select");
   const spaceDownRef = useRef(false);
 
@@ -52,6 +75,16 @@ export function EngineCanvas() {
     if (!canvasRef.current) return;
     return initEngine(canvasRef.current);
   }, [initEngine]);
+
+  // ── Auto-save on tab hide ──────────────────────────────────────────────────
+
+  useEffect(() => {
+    const handler = () => {
+      if (globalThis.document.visibilityState === "hidden") requestSave();
+    };
+    globalThis.document.addEventListener("visibilitychange", handler);
+    return () => globalThis.document.removeEventListener("visibilitychange", handler);
+  }, [requestSave]);
 
   // ── Tool management ────────────────────────────────────────────────────────
 
@@ -68,22 +101,27 @@ export function EngineCanvas() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept shortcuts when the user is typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (isEditableTarget(e.target)) return;
+
+      // Ctrl/Cmd+S — save
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        requestSave();
+        return;
+      }
 
       if (e.key === " ") {
         e.preventDefault();
         if (!spaceDownRef.current) {
           spaceDownRef.current = true;
           setSpaceDown(true);
-          bridgeSetTool("pan"); // temporary override
+          bridgeSetTool("pan");
         }
         return;
       }
 
       const mods = { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey };
 
-      // Tool shortcuts (no modifier required)
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         if (e.key === "v" || e.key === "V") {
           changeTool("select");
@@ -94,17 +132,14 @@ export function EngineCanvas() {
           return;
         }
       }
-
-      if (e.key === "Escape") {
-        sendKeyDown("Escape", mods);
-      }
+      if (e.key === "Escape") sendKeyDown("Escape", mods);
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === " ") {
         spaceDownRef.current = false;
         setSpaceDown(false);
-        bridgeSetTool(toolRef.current); // restore actual tool
+        bridgeSetTool(toolRef.current);
       }
     };
 
@@ -114,43 +149,47 @@ export function EngineCanvas() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [changeTool, bridgeSetTool, sendKeyDown]);
+  }, [changeTool, bridgeSetTool, sendKeyDown, requestSave]);
 
-  // ── Wheel (non-passive so we can preventDefault) ──────────────────────────
+  // ── Wheel (non-passive) ───────────────────────────────────────────────────
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       sendWheel(e.deltaX, e.deltaY, e.offsetX, e.offsetY, getPointerMods(e));
     };
-
     canvas.addEventListener("wheel", onWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", onWheel);
   }, [sendWheel]);
 
-  // ── Pointer events ─────────────────────────────────────────────────────────
+  // ── Pointer ────────────────────────────────────────────────────────────────
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
     setPointerDown(true);
-    sendPointerDown(e.nativeEvent.offsetX, e.nativeEvent.offsetY, e.button, getPointerMods(e));
+    sendPointerDown(
+      e.nativeEvent.offsetX,
+      e.nativeEvent.offsetY,
+      e.button,
+      getPointerMods(e.nativeEvent)
+    );
   };
-
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    sendPointerMove(e.nativeEvent.offsetX, e.nativeEvent.offsetY, getPointerMods(e));
+    sendPointerMove(e.nativeEvent.offsetX, e.nativeEvent.offsetY, getPointerMods(e.nativeEvent));
   };
-
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     setPointerDown(false);
-    sendPointerUp(e.nativeEvent.offsetX, e.nativeEvent.offsetY, e.button, getPointerMods(e));
+    sendPointerUp(
+      e.nativeEvent.offsetX,
+      e.nativeEvent.offsetY,
+      e.button,
+      getPointerMods(e.nativeEvent)
+    );
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
-
-  const zoomPct = Math.round(viewport.zoom * 100);
 
   return (
     <div
@@ -158,7 +197,6 @@ export function EngineCanvas() {
       aria-label="Graphite canvas"
       style={{ position: "relative", width: "100%", height: "100%" }}
     >
-      {/* GPU canvas */}
       <canvas
         ref={canvasRef}
         style={{ display: "block", width: "100%", height: "100%", cursor }}
@@ -167,83 +205,18 @@ export function EngineCanvas() {
         onPointerUp={handlePointerUp}
       />
 
-      {/* Tool bar — top-left */}
       {status === "running" && (
-        <div
-          aria-label="Toolbar"
-          style={{
-            position: "absolute",
-            top: 12,
-            left: 12,
-            display: "flex",
-            gap: 4,
-            background: "rgba(0,0,0,0.55)",
-            borderRadius: 6,
-            padding: "4px 6px",
-          }}
-        >
-          {(["select", "pan"] as const).map((t) => (
-            <button
-              key={t}
-              title={t === "select" ? "Select (V)" : "Pan (H)"}
-              onClick={() => {
-                changeTool(t);
-              }}
-              style={{
-                background: effectiveTool === t ? "rgba(22,119,255,0.85)" : "transparent",
-                border: "none",
-                borderRadius: 4,
-                color: "rgba(255,255,255,0.85)",
-                cursor: "pointer",
-                fontFamily: "monospace",
-                fontSize: 12,
-                padding: "3px 8px",
-                fontWeight: effectiveTool === t ? 600 : 400,
-              }}
-            >
-              {t === "select" ? "V" : "H"}
-            </button>
-          ))}
-        </div>
+        <ToolBar effectiveTool={effectiveTool} onSelectTool={changeTool} onSave={requestSave} />
       )}
 
-      {/* Stats HUD — bottom-left */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          bottom: 12,
-          left: 12,
-          fontFamily: "monospace",
-          fontSize: 11,
-          lineHeight: 1.8,
-          color: "rgba(255,255,255,0.38)",
-          pointerEvents: "none",
-          userSelect: "none",
-        }}
-      >
-        {status === "initializing" && <span>Initializing…</span>}
-
-        {status === "running" && (
-          <>
-            <div>Phase 4 — Interaction ✓</div>
-            <div>
-              {stats.fps} fps · {stats.renderTimeMs.toFixed(2)} ms
-            </div>
-            <div>zoom {zoomPct}%</div>
-            {selectedIds.length > 0 && (
-              <div>
-                {selectedIds.length} shape{selectedIds.length > 1 ? "s" : ""} selected — Esc to
-                deselect
-              </div>
-            )}
-          </>
-        )}
-
-        {status === "error" && (
-          <span style={{ color: "#ff6b6b" }}>{error ?? "Engine error — check console"}</span>
-        )}
-      </div>
+      <StatsHUD
+        status={status}
+        stats={stats}
+        zoomPct={Math.round(viewport.zoom * 100)}
+        lastSaved={lastSaved}
+        selectedCount={selectedIds.length}
+        error={error}
+      />
     </div>
   );
 }

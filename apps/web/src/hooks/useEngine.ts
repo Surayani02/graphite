@@ -2,6 +2,12 @@ import { useCallback, useRef, useState } from "react";
 import { EngineWorkerBridge } from "../engine/bridge";
 import type { EngineStats } from "../engine/bridge";
 import type { ToolType, PointerModifiers, KeyboardModifiers } from "@graphite/protocol";
+import { DEFAULT_CAMERA } from "@graphite/protocol";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** localStorage key.  Versioned to allow future format migrations. */
+const STORAGE_KEY = "graphite-document-v1";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,24 +20,29 @@ export interface ViewportState {
 }
 
 export interface UseEngineResult {
-  // Lifecycle
   initEngine: (canvas: HTMLCanvasElement) => () => void;
   status: EngineStatus;
   stats: EngineStats;
   error: string | null;
-  // Phase 4
   selectedIds: readonly string[];
   viewport: ViewportState;
+  lastSaved: Date | null;
+  // Interaction
   setTool: (tool: ToolType) => void;
   sendPointerDown: (x: number, y: number, button: number, mods: PointerModifiers) => void;
   sendPointerMove: (x: number, y: number, mods: PointerModifiers) => void;
   sendPointerUp: (x: number, y: number, button: number, mods: PointerModifiers) => void;
   sendWheel: (dx: number, dy: number, x: number, y: number, mods: PointerModifiers) => void;
   sendKeyDown: (key: string, mods: KeyboardModifiers) => void;
+  // Document (Phase 5)
+  requestSave: () => void;
 }
 
 const DEFAULT_STATS: EngineStats = { frameNumber: 0, renderTimeMs: 0, fps: 0 };
-const DEFAULT_VIEWPORT: ViewportState = { x: 375, y: 315, zoom: 1 };
+// BUG-06: was a locally-duplicated { x: 375, y: 315, zoom: 1 } literal that
+// had to be kept in sync by hand with the worker's initial camera state.
+// Both now read from the same protocol-level constant.
+const DEFAULT_VIEWPORT: ViewportState = DEFAULT_CAMERA;
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -43,6 +54,7 @@ export function useEngine(): UseEngineResult {
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -56,6 +68,22 @@ export function useEngine(): UseEngineResult {
     bridge
       .on("onReady", () => {
         setStatus("running");
+
+        // Attempt to restore a previously saved document.
+        // Fall back to the default demo scene if nothing is stored or the JSON
+        // is malformed (malformed JSON is removed to avoid a persistent crash).
+        const savedJson = localStorage.getItem(STORAGE_KEY);
+        if (savedJson) {
+          try {
+            JSON.parse(savedJson); // Validate before sending to the worker
+            bridge.loadDocument(savedJson);
+          } catch {
+            localStorage.removeItem(STORAGE_KEY);
+            bridge.newDocument();
+          }
+        } else {
+          bridge.newDocument();
+        }
       })
       .on("onStats", (s) => {
         setStats(s);
@@ -69,6 +97,11 @@ export function useEngine(): UseEngineResult {
       })
       .on("onViewportChanged", (x, y, z) => {
         setViewport({ x, y, zoom: z });
+      })
+      .on("onDocumentState", (json) => {
+        // Worker has serialised the document; persist it locally.
+        localStorage.setItem(STORAGE_KEY, json);
+        setLastSaved(new Date());
       });
 
     bridge.init(canvas);
@@ -88,39 +121,31 @@ export function useEngine(): UseEngineResult {
     };
   }, []);
 
-  // ── Stable interaction callbacks (safe in useEffect deps) ─────────────────
+  // ── Stable callbacks ───────────────────────────────────────────────────────
 
   const setTool = useCallback((tool: ToolType) => {
     bridgeRef.current?.setTool(tool);
   }, []);
-
-  const sendPointerDown = useCallback(
-    (x: number, y: number, button: number, mods: PointerModifiers) => {
-      bridgeRef.current?.sendPointerDown(x, y, button, mods);
-    },
-    []
-  );
-
-  const sendPointerMove = useCallback((x: number, y: number, mods: PointerModifiers) => {
-    bridgeRef.current?.sendPointerMove(x, y, mods);
+  const sendPointerDown = useCallback((x: number, y: number, b: number, m: PointerModifiers) => {
+    bridgeRef.current?.sendPointerDown(x, y, b, m);
   }, []);
-
-  const sendPointerUp = useCallback(
-    (x: number, y: number, button: number, mods: PointerModifiers) => {
-      bridgeRef.current?.sendPointerUp(x, y, button, mods);
-    },
-    []
-  );
-
+  const sendPointerMove = useCallback((x: number, y: number, m: PointerModifiers) => {
+    bridgeRef.current?.sendPointerMove(x, y, m);
+  }, []);
+  const sendPointerUp = useCallback((x: number, y: number, b: number, m: PointerModifiers) => {
+    bridgeRef.current?.sendPointerUp(x, y, b, m);
+  }, []);
   const sendWheel = useCallback(
-    (dx: number, dy: number, x: number, y: number, mods: PointerModifiers) => {
-      bridgeRef.current?.sendWheel(dx, dy, x, y, mods);
+    (dx: number, dy: number, x: number, y: number, m: PointerModifiers) => {
+      bridgeRef.current?.sendWheel(dx, dy, x, y, m);
     },
     []
   );
-
   const sendKeyDown = useCallback((key: string, mods: KeyboardModifiers) => {
     bridgeRef.current?.sendKeyDown(key, mods);
+  }, []);
+  const requestSave = useCallback(() => {
+    bridgeRef.current?.requestSave();
   }, []);
 
   return {
@@ -130,11 +155,13 @@ export function useEngine(): UseEngineResult {
     error,
     selectedIds,
     viewport,
+    lastSaved,
     setTool,
     sendPointerDown,
     sendPointerMove,
     sendPointerUp,
     sendWheel,
     sendKeyDown,
+    requestSave,
   };
 }

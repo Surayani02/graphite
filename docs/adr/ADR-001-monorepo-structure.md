@@ -20,7 +20,7 @@ tasks (build, test, lint) with dependency-aware parallelism and remote caching.
 ### Package layout
 
 | Path                  | Role                                                       |
-| --------------------- | ---------------------------------------------------------- |
+|-----------------------|------------------------------------------------------------|
 | `packages/protocol`   | Shared TypeScript types — the only cross-boundary contract |
 | `packages/engine`     | Rust graphics engine → WASM                                |
 | `packages/document`   | Rust document model → WASM                                 |
@@ -43,7 +43,7 @@ tasks (build, test, lint) with dependency-aware parallelism and remote caching.
 ## Alternatives Considered
 
 | Alternative           | Reason Rejected                                                                                    |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
+|-----------------------|----------------------------------------------------------------------------------------------------|
 | Separate repositories | High coordination overhead; breaking changes require synchronised PRs across repos                 |
 | NX                    | More powerful but higher initial complexity; Turborepo's simpler model is sufficient at this scale |
 | Lerna                 | Largely superseded by Turborepo; adds a third tool to learn                                        |

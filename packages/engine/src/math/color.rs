@@ -1,4 +1,13 @@
-/// sRGB colour with pre-multiplied alpha stored as `u8` components.
+/// sRGB colour with **straight alpha**, stored as `u8` components
+/// (0 = minimum, 255 = maximum).
+///
+/// All four channels are independent — the alpha channel is **not**
+/// pre-multiplied into RGB. `to_f32_array()` performs a plain per-channel
+/// division by 255, and the WGSL fragment shader composites using
+/// straight-alpha `smoothstep` blending. If pre-multiplied alpha is ever
+/// needed (e.g. certain texture upload or compositing paths), introduce a
+/// distinct `PremultipliedColor` newtype with an explicit conversion rather
+/// than overloading this type's meaning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color {
     pub r: u8,

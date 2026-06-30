@@ -123,5 +123,6 @@ criterion_group!(
     bench_set_stroke,
     bench_render_list_all_visible,
     bench_render_list_mostly_culled,
+    bench_hit_test,
 );
 criterion_main!(benches);

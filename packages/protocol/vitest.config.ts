@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config"; // Keep importing from vitest/config
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {

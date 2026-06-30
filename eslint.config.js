@@ -28,8 +28,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
-          argsIgnorePattern:        "^_",
-          varsIgnorePattern:        "^_",
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
           caughtErrorsIgnorePattern: "^_",
         },
       ],
@@ -38,12 +38,6 @@ export default tseslint.config(
     },
   },
   {
-    ignores: [
-      "**/dist/**",
-      "**/pkg/**",
-      "**/node_modules/**",
-      "**/target/**",
-      "**/*.gen.ts",
-    ],
+    ignores: ["**/dist/**", "**/pkg/**", "**/node_modules/**", "**/target/**", "**/*.gen.ts"],
   }
 );

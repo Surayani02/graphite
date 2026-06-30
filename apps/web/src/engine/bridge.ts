@@ -1,9 +1,9 @@
 /**
- * EngineWorkerBridge — Phase 4
+ * EngineWorkerBridge — Phase 5
  *
- * Additions:
- *   - onSelectionChanged / onViewportChanged events
- *   - setTool, sendPointerDown/Move/Up, sendWheel, sendKeyDown methods
+ * Additions over Phase 4:
+ *   - onDocumentState event
+ *   - loadDocument(), newDocument(), requestSave() methods
  */
 
 import type {
@@ -28,6 +28,8 @@ export interface EngineBridgeEvents {
   onError: (message: string) => void;
   onSelectionChanged: (nodeIds: readonly string[]) => void;
   onViewportChanged: (x: number, y: number, zoom: number) => void;
+  // Phase 5
+  onDocumentState: (json: string) => void;
 }
 
 // ─── Class ────────────────────────────────────────────────────────────────────
@@ -48,7 +50,12 @@ export class EngineWorkerBridge {
       this.handleWorkerMessage(e.data);
     };
     this.worker.onerror = (e: ErrorEvent) => {
-      this.handlers.onError?.(`Worker uncaught error: ${e.message}`);
+      // QUAL-05: e.message can be undefined (CSP violation, module load
+      // failure) — falling through to the bare template literal would
+      // produce the unhelpful "Worker uncaught error: undefined". Include
+      // filename/line when present so there's something to act on.
+      const detail = [e.message, e.filename, e.lineno].filter(Boolean).join(" @ ");
+      this.handlers.onError?.(`Worker uncaught error: ${detail || "no detail available"}`);
     };
   }
 
@@ -56,6 +63,8 @@ export class EngineWorkerBridge {
     this.handlers[event] = handler;
     return this;
   }
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   init(canvas: HTMLCanvasElement): void {
     if (this.initialized) return;
@@ -69,7 +78,15 @@ export class EngineWorkerBridge {
       devicePixelRatio: dpr,
     };
     this.worker.postMessage(initMsg, [offscreen]);
-    this.resize(rect.width, rect.height);
+
+    // QUAL-08: getBoundingClientRect() can return 0×0 if called before
+    // layout has settled. Skipping a 0×0 resize here is purely defensive —
+    // the caller's ResizeObserver (see useEngine.ts) is guaranteed to fire
+    // at least once with the real size immediately after `observe()`, so
+    // this only avoids one redundant zero-size round-trip, not a visible bug.
+    if (rect.width > 0 && rect.height > 0) {
+      this.resize(rect.width, rect.height);
+    }
   }
 
   resize(cssWidth: number, cssHeight: number): void {
@@ -89,26 +106,59 @@ export class EngineWorkerBridge {
     this.worker.terminate();
   }
 
-  // ── Interaction ───────────────────────────────────────────────────────────
+  // ── Document (Phase 5) ────────────────────────────────────────────────────
+
+  /** Load a document from its serialised JSON representation. */
+  loadDocument(json: string): void {
+    const msg: MainToEngineMessage = { type: "document:load", json };
+    this.worker.postMessage(msg);
+  }
+
+  /** Start a fresh default scene (no saved document). */
+  newDocument(): void {
+    const msg: MainToEngineMessage = { type: "document:new" };
+    this.worker.postMessage(msg);
+  }
+
+  /** Request the worker to serialise and return the current document. */
+  requestSave(): void {
+    const msg: MainToEngineMessage = { type: "document:request_save" };
+    this.worker.postMessage(msg);
+  }
+
+  // ── Interaction (Phase 4) ─────────────────────────────────────────────────
 
   setTool(tool: ToolType): void {
-    const msg: MainToEngineMessage = { type: "tool:set", tool };
-    this.worker.postMessage(msg);
+    this.worker.postMessage({ type: "tool:set", tool } satisfies MainToEngineMessage);
   }
 
   sendPointerDown(x: number, y: number, button: number, modifiers: PointerModifiers): void {
-    const msg: MainToEngineMessage = { type: "pointer:down", x, y, button, modifiers };
-    this.worker.postMessage(msg);
+    this.worker.postMessage({
+      type: "pointer:down",
+      x,
+      y,
+      button,
+      modifiers,
+    } satisfies MainToEngineMessage);
   }
 
   sendPointerMove(x: number, y: number, modifiers: PointerModifiers): void {
-    const msg: MainToEngineMessage = { type: "pointer:move", x, y, modifiers };
-    this.worker.postMessage(msg);
+    this.worker.postMessage({
+      type: "pointer:move",
+      x,
+      y,
+      modifiers,
+    } satisfies MainToEngineMessage);
   }
 
   sendPointerUp(x: number, y: number, button: number, modifiers: PointerModifiers): void {
-    const msg: MainToEngineMessage = { type: "pointer:up", x, y, button, modifiers };
-    this.worker.postMessage(msg);
+    this.worker.postMessage({
+      type: "pointer:up",
+      x,
+      y,
+      button,
+      modifiers,
+    } satisfies MainToEngineMessage);
   }
 
   sendWheel(
@@ -118,20 +168,18 @@ export class EngineWorkerBridge {
     y: number,
     modifiers: PointerModifiers
   ): void {
-    const msg: MainToEngineMessage = {
+    this.worker.postMessage({
       type: "wheel:scroll",
       deltaX,
       deltaY,
       x,
       y,
       modifiers,
-    };
-    this.worker.postMessage(msg);
+    } satisfies MainToEngineMessage);
   }
 
   sendKeyDown(key: string, modifiers: KeyboardModifiers): void {
-    const msg: MainToEngineMessage = { type: "key:down", key, modifiers };
-    this.worker.postMessage(msg);
+    this.worker.postMessage({ type: "key:down", key, modifiers } satisfies MainToEngineMessage);
   }
 
   // ── Incoming messages ─────────────────────────────────────────────────────
@@ -168,6 +216,10 @@ export class EngineWorkerBridge {
       }
       case "viewport:changed": {
         this.handlers.onViewportChanged?.(msg.x, msg.y, msg.zoom);
+        break;
+      }
+      case "document:state": {
+        this.handlers.onDocumentState?.(msg.json);
         break;
       }
       default:

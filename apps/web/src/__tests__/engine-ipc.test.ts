@@ -196,26 +196,79 @@ describe("Phase 4 viewport message", () => {
   });
 
   it("zoom-on-cursor formula keeps world point fixed", () => {
-    // Camera at (100, 100), zoom 1, viewport 800×600
-    // Pivot cursor at physical (400, 300) — centre of viewport
-    // Pivot world = (400 - 400) / 1 + 100 = 100
+    // Camera at (100, 50), zoom 1, viewport 800×600.
+    // Pivot cursor at physical (200, 150) — deliberately OFF-CENTER
+    // (viewport center would be 400,300). An earlier version of this test
+    // used a centered pivot, which makes (pivotPhys - vp/2) zero on both
+    // axes — the camera mathematically can't move in that case regardless
+    // of zoom, which made the test pass for the wrong reason while also
+    // asserting an arithmetically incorrect expected value. An off-center
+    // pivot actually exercises camera movement.
     const camX = 100,
-      camY = 100,
+      camY = 50,
       zoom = 1;
     const vpW = 800,
       vpH = 600;
-    const pivotPhysX = 400,
-      pivotPhysY = 300;
+    const pivotPhysX = 200,
+      pivotPhysY = 150;
 
+    // pivotWorldX = (200 - 400)/1 + 100 = -100
+    // pivotWorldY = (150 - 300)/1 +  50 = -100
     const pivotWorldX = (pivotPhysX - vpW / 2) / zoom + camX;
     const pivotWorldY = (pivotPhysY - vpH / 2) / zoom + camY;
 
     const newZoom = 2.0;
+    // newCamX = -100 - (200-400)/2 = -100 - (-100) =   0
+    // newCamY = -100 - (150-300)/2 = -100 - ( -75) = -25
     const newCamX = pivotWorldX - (pivotPhysX - vpW / 2) / newZoom;
     const newCamY = pivotWorldY - (pivotPhysY - vpH / 2) / newZoom;
-    const newWorld = (pivotPhysX - vpW / 2) / newZoom + newCamX;
 
-    expect(newWorld).toBeCloseTo(pivotWorldX, 5); // pivot world unchanged
-    expect(newCamX).toBeCloseTo(50, 5); // camera moved to keep pivot fixed
+    // Recompute the pivot's world position under the new camera/zoom —
+    // this is the actual invariant zoom-on-cursor must satisfy.
+    const newWorldX = (pivotPhysX - vpW / 2) / newZoom + newCamX;
+    const newWorldY = (pivotPhysY - vpH / 2) / newZoom + newCamY;
+
+    expect(newWorldX).toBeCloseTo(pivotWorldX, 5); // pivot world X unchanged
+    expect(newWorldY).toBeCloseTo(pivotWorldY, 5); // pivot world Y unchanged
+
+    // Hand-verified expected camera position (see comments above) —
+    // catches a class of bug where the invariant above could accidentally
+    // hold while the formula is still wrong.
+    expect(newCamX).toBeCloseTo(0, 5);
+    expect(newCamY).toBeCloseTo(-25, 5);
+  });
+});
+
+// ─── Phase 5: Document IPC messages ──────────────────────────────────────────
+
+describe("Document IPC messages — Main → Engine", () => {
+  it("document:load carries a json string", () => {
+    const msg: MainToEngineMessage = {
+      type: "document:load",
+      json: '{"version":1,"name":"Test","nodes":[]}',
+    };
+    expect(msg.type).toBe("document:load");
+    expect(typeof msg.json).toBe("string");
+  });
+
+  it("document:new has exactly one key", () => {
+    const msg: MainToEngineMessage = { type: "document:new" };
+    expect(Object.keys(msg)).toHaveLength(1);
+  });
+
+  it("document:request_save has exactly one key", () => {
+    const msg: MainToEngineMessage = { type: "document:request_save" };
+    expect(Object.keys(msg)).toHaveLength(1);
+  });
+});
+
+describe("Document IPC messages — Engine → Main", () => {
+  it("document:state carries a json string", () => {
+    const msg: EngineToMainMessage = {
+      type: "document:state",
+      json: '{"version":2,"name":"Demo","nodes":[]}',
+    };
+    expect(msg.type).toBe("document:state");
+    expect(typeof msg.json).toBe("string");
   });
 });
