@@ -34,7 +34,7 @@ Use **WebGPU** exclusively. No WebGL 2 fallback path.
 ## Alternatives Considered
 
 | Alternative                                   | Reason rejected                                                                                                                         |
-|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | WebGL 2                                       | No compute shaders; implicit global state fights the renderer's architecture; no clear migration path to WebGPU later without a rewrite |
 | WebGL 2 with a WebGPU migration planned later | Building two render backends multiplies maintenance cost for a feature (broader browser support) this project doesn't urgently need     |
 | Canvas2D                                      | No GPU instancing; cannot hit the 60 FPS / 100,000-object performance targets                                                           |

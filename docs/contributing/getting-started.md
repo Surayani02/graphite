@@ -3,7 +3,7 @@
 ## Prerequisites
 
 | Tool        | Min version | Install                   |
-|-------------|-------------|---------------------------|
+| ----------- | ----------- | ------------------------- |
 | Node.js     | 24.0.0      | https://nodejs.org        |
 | pnpm        | 11.0.0      | `npm install -g pnpm`     |
 | Rust        | stable      | https://rustup.rs         |

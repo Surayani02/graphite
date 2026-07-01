@@ -31,7 +31,7 @@ See ADR-002 (WebGPU), ADR-003 (OffscreenCanvas + Worker), ADR-004
 ## Package map
 
 | Package               | Role                                                                | Status          |
-|-----------------------|---------------------------------------------------------------------|-----------------|
+| --------------------- | ------------------------------------------------------------------- | --------------- |
 | `packages/protocol`   | Shared TypeScript types, IPC + network message schemas              | Active          |
 | `packages/engine`     | Rust scene graph + WebGPU rendering, compiled to WASM               | Active          |
 | `packages/document`   | Placeholder — see [ADR-010](./adr/ADR-010-document-crate-status.md) | Inert           |
@@ -44,7 +44,7 @@ See ADR-002 (WebGPU), ADR-003 (OffscreenCanvas + Worker), ADR-004
 ## Performance targets
 
 | Subsystem                         | Target                |
-|-----------------------------------|-----------------------|
+| --------------------------------- | --------------------- |
 | Canvas render                     | 60 FPS minimum        |
 | Selection response                | < 16ms                |
 | Document load                     | < 1s for medium files |
@@ -91,7 +91,7 @@ structure before constructing a model from it (see `document/validate.ts`).
 ## Roadmap
 
 | Phase | Milestone                                                |
-|-------|----------------------------------------------------------|
+| ----- | -------------------------------------------------------- |
 | 0     | Foundation — monorepo, tooling, CI                       |
 | 1     | Engine shell — WebGPU, Web Worker, OffscreenCanvas       |
 | 2     | Scene graph core — Rust/WASM arena, render list          |

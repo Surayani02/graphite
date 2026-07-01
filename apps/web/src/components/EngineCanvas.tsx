@@ -1,31 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useEngine } from "../hooks/useEngine";
-import type { ToolType, PointerModifiers } from "@graphite/protocol";
-import { ToolBar } from "./ToolBar";
-import { StatsHUD } from "./StatsHUD";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+import { useEffect, useRef, useState } from "react";
+import { useEngineContext } from "../context/EngineContext";
+import { useUIStore, selectEffectiveTool } from "../stores/uiStore";
+import { useSyncToolWithEngine } from "../hooks/useSyncToolWithEngine";
+import type { PointerModifiers } from "@graphite/protocol";
 
 function getPointerMods(e: PointerEvent | WheelEvent): PointerModifiers {
   return { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey };
 }
 
-/**
- * QUAL-10: the previous guard only excluded `HTMLInputElement` and
- * `HTMLTextAreaElement`, so typing "v" into a `contenteditable` element
- * (e.g. a future inline rename field, comment box, or text-tool overlay)
- * would still trigger the "switch to select tool" shortcut. `isContentEditable`
- * covers every editable surface generically, including ones added later,
- * without needing this list updated per new component.
- *
- * Listeners stay on `window` rather than being scoped to a focused wrapper
- * element (the literal fix suggested by the static-analysis report): for a
- * design tool, keyboard shortcuts are expected to work regardless of which
- * panel currently has DOM focus (this is how Figma, Linear, and Sketch all
- * behave) — scoping to focus would silently break shortcuts the moment
- * focus lands somewhere unexpected, which is a worse failure mode than the
- * narrow gap being closed here.
- */
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return (
@@ -35,48 +17,38 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
+/**
+ * Phase 6: trimmed to canvas + input wiring only. The toolbar and stats
+ * HUD that used to float on top of this component are now docked panels
+ * in AppShell (TopToolbar, StatusBar) reading the same engine context.
+ */
 export function EngineCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   const {
     initEngine,
-    status,
-    stats,
-    error,
-    selectedIds,
-    viewport,
-    lastSaved,
-    setTool: bridgeSetTool,
     sendPointerDown,
     sendPointerMove,
     sendPointerUp,
     sendWheel,
     sendKeyDown,
     requestSave,
-  } = useEngine();
+  } = useEngineContext();
 
-  // ── Local UI state ─────────────────────────────────────────────────────────
+  const setActiveTool = useUIStore((s) => s.setActiveTool);
+  const setSpaceDown = useUIStore((s) => s.setSpaceDown);
+  const effectiveTool = useUIStore(selectEffectiveTool);
 
-  const [tool, setToolState] = useState<ToolType>("select");
-  const [spaceDown, setSpaceDown] = useState(false);
   const [isPointerDown, setPointerDown] = useState(false);
-
-  const toolRef = useRef<ToolType>("select");
   const spaceDownRef = useRef(false);
 
-  const effectiveTool: ToolType = spaceDown ? "pan" : tool;
-  const cursor = effectiveTool === "pan" ? (isPointerDown ? "grabbing" : "grab") : "default";
+  useSyncToolWithEngine();
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  const cursor = effectiveTool === "pan" ? (isPointerDown ? "grabbing" : "grab") : "default";
 
   useEffect(() => {
     if (!canvasRef.current) return;
     return initEngine(canvasRef.current);
   }, [initEngine]);
-
-  // ── Auto-save on tab hide ──────────────────────────────────────────────────
 
   useEffect(() => {
     const handler = () => {
@@ -86,24 +58,10 @@ export function EngineCanvas() {
     return () => globalThis.document.removeEventListener("visibilitychange", handler);
   }, [requestSave]);
 
-  // ── Tool management ────────────────────────────────────────────────────────
-
-  const changeTool = useCallback(
-    (newTool: ToolType) => {
-      toolRef.current = newTool;
-      setToolState(newTool);
-      bridgeSetTool(newTool);
-    },
-    [bridgeSetTool]
-  );
-
-  // ── Keyboard ───────────────────────────────────────────────────────────────
-
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isEditableTarget(e.target)) return;
 
-      // Ctrl/Cmd+S — save
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         requestSave();
@@ -115,7 +73,6 @@ export function EngineCanvas() {
         if (!spaceDownRef.current) {
           spaceDownRef.current = true;
           setSpaceDown(true);
-          bridgeSetTool("pan");
         }
         return;
       }
@@ -124,11 +81,11 @@ export function EngineCanvas() {
 
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
         if (e.key === "v" || e.key === "V") {
-          changeTool("select");
+          setActiveTool("select");
           return;
         }
         if (e.key === "h" || e.key === "H") {
-          changeTool("pan");
+          setActiveTool("pan");
           return;
         }
       }
@@ -139,7 +96,6 @@ export function EngineCanvas() {
       if (e.key === " ") {
         spaceDownRef.current = false;
         setSpaceDown(false);
-        bridgeSetTool(toolRef.current);
       }
     };
 
@@ -149,9 +105,7 @@ export function EngineCanvas() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [changeTool, bridgeSetTool, sendKeyDown, requestSave]);
-
-  // ── Wheel (non-passive) ───────────────────────────────────────────────────
+  }, [setActiveTool, setSpaceDown, sendKeyDown, requestSave]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -163,8 +117,6 @@ export function EngineCanvas() {
     canvas.addEventListener("wheel", onWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", onWheel);
   }, [sendWheel]);
-
-  // ── Pointer ────────────────────────────────────────────────────────────────
 
   const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -189,33 +141,15 @@ export function EngineCanvas() {
     );
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
-    <div
-      role="region"
-      aria-label="Graphite canvas"
-      style={{ position: "relative", width: "100%", height: "100%" }}
-    >
+    <div role="region" aria-label="Graphite canvas" className="relative h-full w-full">
       <canvas
         ref={canvasRef}
-        style={{ display: "block", width: "100%", height: "100%", cursor }}
+        className="block h-full w-full"
+        style={{ cursor }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-      />
-
-      {status === "running" && (
-        <ToolBar effectiveTool={effectiveTool} onSelectTool={changeTool} onSave={requestSave} />
-      )}
-
-      <StatsHUD
-        status={status}
-        stats={stats}
-        zoomPct={Math.round(viewport.zoom * 100)}
-        lastSaved={lastSaved}
-        selectedCount={selectedIds.length}
-        error={error}
       />
     </div>
   );

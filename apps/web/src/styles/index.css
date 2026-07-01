@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/**
+ * Design tokens — Phase 6 Milestone 1.
+ *
+ * Colour, radius, and font tokens only. Layout-specific dimensions (panel
+ * widths, toolbar height) use Tailwind's built-in spacing scale or
+ * arbitrary values directly in JSX rather than inventing a custom
+ * `--spacing-*` namespace per dimension — keeps the token surface small
+ * and avoids guessing at generated utility-class names for one-off sizes.
+ */
+@theme {
+    --color-surface-canvas: #0f1016;
+    --color-surface-panel: #16181f;
+    --color-surface-panel-hover: #1c1f28;
+    --color-border-subtle: rgb(255 255 255 / 8%);
+    --color-content-primary: rgb(255 255 255 / 92%);
+    --color-content-secondary: rgb(255 255 255 / 60%);
+    --color-content-tertiary: rgb(255 255 255 / 38%);
+    --color-accent: #1677ff;
+    --color-accent-hover: #3b8aff;
+    --color-danger: #ff6b6b;
+
+    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+html,
+body,
+#root {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    -webkit-font-smoothing: antialiased;
+}

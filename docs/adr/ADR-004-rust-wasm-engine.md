@@ -36,7 +36,7 @@ WebAssembly via `wasm-bindgen`, and called from the engine worker.
 ## Alternatives Considered
 
 | Alternative                                              | Reason rejected                                                                                                                                                     |
-|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Pure TypeScript scene graph (typed arrays, manual arena) | Achievable, but re-implements by hand what Rust's ownership model gives for free, and still pays a real (if smaller) GC tax for any object-shaped intermediate data |
 | AssemblyScript                                           | Smaller ecosystem, less mature tooling, and the team has no advantage over plain Rust for this use case                                                             |
 | C++ via Emscripten                                       | No memory safety guarantees; steeper toolchain (Emscripten + CMake) for no benefit over Rust + wasm-bindgen                                                         |
