@@ -2,7 +2,7 @@
 
 **Date**: Phase 5 architecture review
 **Status**: Accepted
-**Deciders**: Engineering Team
+**Deciders**: Surajit (Project Lead)
 
 > **Note on numbering**: this ADR is scoped to the `packages/document`
 > _Rust crate's_ unresolved ownership/future question (raised during this

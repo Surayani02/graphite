@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { EngineToMainMessage, MainToEngineMessage } from "@graphite/protocol";
-import { FRAME_BUDGET_MS, TARGET_FPS } from "@graphite/protocol";
+import { FRAME_BUDGET_MS, TARGET_FPS, createNodeId } from "@graphite/protocol";
 
 // ─── Main → Engine ───────────────────────────────────────────────────────────
 
@@ -270,5 +270,68 @@ describe("Document IPC messages — Engine → Main", () => {
     };
     expect(msg.type).toBe("document:state");
     expect(typeof msg.json).toBe("string");
+  });
+});
+
+// ─── Phase 6 Milestone 2: Layers / Inspector IPC messages ────────────────────
+
+describe("Document IPC messages — Phase 6 Milestone 2", () => {
+  it("document:nodes carries the full node list", () => {
+    const msg: EngineToMainMessage = {
+      type: "document:nodes",
+      nodes: [
+        {
+          id: "f1",
+          kind: "frame",
+          name: "Frame",
+          x: 0,
+          y: 0,
+          w: 800,
+          h: 600,
+          fill: { r: 0, g: 0, b: 0, a: 0 },
+          stroke: null,
+          cornerRadius: 0,
+          parent: null,
+          children: ["r1"],
+        },
+      ],
+    };
+    expect(msg.nodes).toHaveLength(1);
+    expect(msg.nodes[0]?.kind).toBe("frame");
+  });
+
+  it("document:nodes accepts an empty list", () => {
+    const msg: EngineToMainMessage = { type: "document:nodes", nodes: [] };
+    expect(msg.nodes).toHaveLength(0);
+  });
+
+  it("selection:set carries zero or more node ids", () => {
+    const empty: MainToEngineMessage = { type: "selection:set", nodeIds: [] };
+    const one: MainToEngineMessage = {
+      type: "selection:set",
+      nodeIds: [createNodeId()],
+    };
+    expect(empty.nodeIds).toHaveLength(0);
+    expect(one.nodeIds).toHaveLength(1);
+  });
+
+  it("node:update carries a partial patch", () => {
+    const msg: MainToEngineMessage = {
+      type: "node:update",
+      nodeId: "r1",
+      patch: { w: 100, h: 50 },
+    };
+    expect(msg.patch).toEqual({ w: 100, h: 50 });
+  });
+
+  it("node:update's stroke field distinguishes 'unset' from 'clear'", () => {
+    const unset: MainToEngineMessage = { type: "node:update", nodeId: "r1", patch: { x: 1 } };
+    const cleared: MainToEngineMessage = {
+      type: "node:update",
+      nodeId: "r1",
+      patch: { stroke: null },
+    };
+    expect(unset.patch.stroke).toBeUndefined();
+    expect(cleared.patch.stroke).toBeNull();
   });
 });

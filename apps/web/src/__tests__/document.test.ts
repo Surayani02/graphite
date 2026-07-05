@@ -131,6 +131,49 @@ describe("DocumentModel — setStroke", () => {
   });
 });
 
+// ─── setSize / setFill (Phase 6 Milestone 2) ─────────────────────────────────
+
+describe("DocumentModel — setSize", () => {
+  it("updates width and height", () => {
+    const doc = new DocumentModel();
+    doc.addFrame("f1", 0, 0, 800, 600);
+    doc.addRect("r1", "f1", 0, 0, 100, 100, FILL);
+    doc.setSize("r1", 40, 50);
+    expect(doc.getNode("r1")).toMatchObject({ w: 40, h: 50 });
+  });
+  it("is a no-op on a missing id", () => {
+    const doc = new DocumentModel();
+    const before = doc.version;
+    doc.setSize("missing", 40, 50);
+    expect(doc.version).toBe(before);
+  });
+});
+
+describe("DocumentModel — setFill", () => {
+  it("updates the fill colour", () => {
+    const doc = new DocumentModel();
+    doc.addFrame("f1", 0, 0, 800, 600);
+    doc.addRect("r1", "f1", 0, 0, 100, 100, FILL);
+    doc.setFill("r1", { r: 1, g: 2, b: 3, a: 4 });
+    expect(doc.getNode("r1")?.fill).toEqual({ r: 1, g: 2, b: 3, a: 4 });
+  });
+  it("does not alias the caller's colour object", () => {
+    const doc = new DocumentModel();
+    doc.addFrame("f1", 0, 0, 800, 600);
+    doc.addRect("r1", "f1", 0, 0, 100, 100, FILL);
+    const color = { r: 1, g: 2, b: 3, a: 4 };
+    doc.setFill("r1", color);
+    color.r = 255;
+    expect(doc.getNode("r1")?.fill.r).toBe(1);
+  });
+  it("is a no-op on a missing id", () => {
+    const doc = new DocumentModel();
+    const before = doc.version;
+    doc.setFill("missing", { r: 1, g: 2, b: 3, a: 4 });
+    expect(doc.version).toBe(before);
+  });
+});
+
 // ─── getNodesInOrder ──────────────────────────────────────────────────────────
 
 describe("DocumentModel — getNodesInOrder", () => {
@@ -329,6 +372,20 @@ describe("DocumentModel.fromJson — structural validation", () => {
           children: ["r1"],
         },
         {
+          id: "f2",
+          kind: "frame",
+          name: "Other frame",
+          x: 0,
+          y: 0,
+          w: 1,
+          h: 1,
+          fill: { r: 0, g: 0, b: 0, a: 0 },
+          stroke: null,
+          cornerRadius: 0,
+          parent: null,
+          children: [],
+        },
+        {
           id: "r1",
           kind: "rect",
           name: "Rect",
@@ -339,7 +396,9 @@ describe("DocumentModel.fromJson — structural validation", () => {
           fill: FILL,
           stroke: null,
           cornerRadius: 0,
-          parent: "someone-else", // mismatch — should be "f1"
+          // "f2" exists (so the missing-parent check passes) but does not
+          // list r1 as a child — this is what the backlink check catches.
+          parent: "f2",
           children: [],
         },
       ],
@@ -351,5 +410,53 @@ describe("DocumentModel.fromJson — structural validation", () => {
     const doc = DocumentModel.fromJson(JSON.stringify({ version: 1, name: "Empty", nodes: [] }));
     expect(doc.nodeCount).toBe(0);
     expect(doc.name).toBe("Empty");
+  });
+});
+
+// ─── fromJson structural validation (Phase 6 M2 closeout) ────────────────────
+
+describe("DocumentModel.fromJson — structural validation", () => {
+  const frame = {
+    id: "f1",
+    kind: "frame",
+    name: "Frame",
+    x: 0,
+    y: 0,
+    w: 800,
+    h: 600,
+    fill: { r: 0, g: 0, b: 0, a: 0 },
+    stroke: null,
+    cornerRadius: 0,
+    parent: null,
+    children: ["r1"],
+  };
+  const rect = {
+    id: "r1",
+    kind: "rect",
+    name: "Rect",
+    x: 10,
+    y: 10,
+    w: 100,
+    h: 100,
+    fill: { r: 255, g: 0, b: 0, a: 255 },
+    stroke: null,
+    cornerRadius: 0,
+    parent: "f1",
+    children: [],
+  };
+  const json = (nodes: readonly unknown[]) => JSON.stringify({ version: 1, name: "T", nodes });
+
+  it("rejects duplicate node ids", () => {
+    // A duplicate would silently overwrite its predecessor in the node map
+    // while insertionOrder kept both — one node rendered twice.
+    expect(() => DocumentModel.fromJson(json([frame, rect, { ...rect }]))).toThrow(
+      /duplicate node id/
+    );
+  });
+
+  it("rejects a node whose parent does not exist", () => {
+    expect(() => DocumentModel.fromJson(json([frame, { ...rect, parent: "ghost" }]))).toThrow(
+      /missing parent/
+    );
   });
 });

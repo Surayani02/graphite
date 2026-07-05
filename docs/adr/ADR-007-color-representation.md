@@ -2,7 +2,7 @@
 
 **Date**: Phase 2 (decision); clarified during the Phase 5 architecture review
 **Status**: Accepted
-**Deciders**: Engineering Team
+**Deciders**: Surajit (Project Lead)
 
 ## Context
 

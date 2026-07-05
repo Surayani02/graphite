@@ -1,5 +1,5 @@
 /**
- * Graphite document model — Phase 5.
+ * Graphite document model — Phase 5, extended Phase 6 Milestone 2.
  *
  * Source of truth for the scene.  The SceneGraph in the engine worker is a
  * derived, ephemeral rendering structure rebuilt from this model on every load.
@@ -11,49 +11,16 @@
  *   - This file has zero DOM or WebWorker dependencies — it runs in both.
  *   - Colour values use `Color` from `@graphite/protocol` (0–255 straight
  *     alpha) rather than a locally-defined type — see ADR-007 / BUG-01.
+ *   - `DocNode`/`DocNodeKind`/`DocStroke`/`DocumentData` moved to
+ *     `@graphite/protocol` in Phase 6 M2 (the `document:nodes` IPC message
+ *     needs this shape, and protocol can't depend back on apps/web) and are
+ *     re-exported below so existing imports from this module don't break.
  */
 
-import type { Color } from "@graphite/protocol";
+import type { Color, DocNode, DocNodeKind, DocStroke, DocumentData } from "@graphite/protocol";
 import { assertValidDocumentData } from "./validate";
 
-// ─── Public types ─────────────────────────────────────────────────────────────
-
-/** Centre-aligned stroke style. */
-export interface DocStroke {
-  color: Color;
-  width: number;
-}
-
-export type DocNodeKind = "frame" | "rect" | "ellipse";
-
-/**
- * One node in the document graph.
- *
- * `id`     — UUID v4, stable across sessions.
- * `x`, `y` — world-space top-left, Y-down.
- * `parent` — `null` for root nodes (frames).
- */
-export interface DocNode {
-  readonly id: string;
-  kind: DocNodeKind;
-  name: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  fill: Color;
-  stroke: DocStroke | null;
-  cornerRadius: number;
-  parent: string | null;
-  children: string[];
-}
-
-export interface DocumentData {
-  /** Mutation counter — incremented on every write. */
-  version: number;
-  name: string;
-  nodes: DocNode[];
-}
+export type { Color, DocNode, DocNodeKind, DocStroke, DocumentData };
 
 // ─── DocumentModel ────────────────────────────────────────────────────────────
 
@@ -194,6 +161,23 @@ export class DocumentModel {
     if (!node) return;
     node.x = x;
     node.y = y;
+    this._version++;
+  }
+
+  /** Phase 6 M2 — Inspector width/height edits. */
+  setSize(id: string, w: number, h: number): void {
+    const node = this.nodeMap.get(id);
+    if (!node) return;
+    node.w = w;
+    node.h = h;
+    this._version++;
+  }
+
+  /** Phase 6 M2 — Inspector fill edits. */
+  setFill(id: string, fill: Color): void {
+    const node = this.nodeMap.get(id);
+    if (!node) return;
+    node.fill = { ...fill };
     this._version++;
   }
 

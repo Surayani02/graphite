@@ -2,7 +2,7 @@
 
 **Date**: 26-06-2026
 **Status**: Accepted  
-**Deciders**: Engineering Team
+**Deciders**: Surajit (Project Lead)
 
 ## Context
 

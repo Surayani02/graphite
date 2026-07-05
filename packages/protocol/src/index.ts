@@ -125,6 +125,73 @@ export interface KeyboardModifiers {
   readonly meta: boolean;
 }
 
+// ─── Document node model (Phase 6 M2) ────────────────────────────────────────
+//
+// Relocated here from apps/web/src/document/model.ts. The document:nodes IPC
+// message (below) needs to carry this shape, and packages/protocol cannot
+// depend on apps/web — that would invert the intended dependency direction
+// (protocol is the thing other packages import, never the reverse), the
+// exact boundary violation BUG-01 already found once with Color/DocColor.
+// model.ts re-exports all five names so nothing importing from "./model"
+// (validate.ts, document.test.ts) needs to change.
+//
+// id/parent/children stay plain `string`, not the branded NodeId above —
+// upgrading them isn't needed for Milestone 2 and would ripple into
+// scene/demo.ts's id generation for no functional gain.
+
+export type DocNodeKind = "frame" | "rect" | "ellipse";
+
+/** Centre-aligned stroke style. */
+export interface DocStroke {
+  color: Color;
+  width: number;
+}
+
+/**
+ * One node in the document graph.
+ *
+ * `id`     — UUID v4, stable across sessions.
+ * `x`, `y` — world-space top-left, Y-down.
+ * `parent` — `null` for root nodes (frames).
+ */
+export interface DocNode {
+  readonly id: string;
+  kind: DocNodeKind;
+  name: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  fill: Color;
+  stroke: DocStroke | null;
+  cornerRadius: number;
+  parent: string | null;
+  children: string[];
+}
+
+export interface DocumentData {
+  /** Mutation counter — incremented on every write. */
+  version: number;
+  name: string;
+  nodes: DocNode[];
+}
+
+/**
+ * Partial edit applied to one node via the Inspector panel (Phase 6 M2).
+ * `stroke: null` explicitly removes the stroke; `stroke` simply absent
+ * (`undefined`) means "leave the stroke unchanged" — this is why every
+ * field here is optional rather than `DocStroke | null` being forced.
+ */
+export interface NodePatch {
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  fill?: Color;
+  stroke?: DocStroke | null;
+  cornerRadius?: number;
+}
+
 // ─── IPC — Engine Worker → Main thread ───────────────────────────────────────
 
 export type EngineToMainMessage =
@@ -148,6 +215,13 @@ export type EngineToMainMessage =
       readonly type: "document:state";
       /** Complete document serialised as JSON — write to localStorage. */
       readonly json: string;
+    }
+  // ── Phase 6 Milestone 2 ─────────────────────────────────────────────────────
+  | {
+      /** Full node list, pushed after document load/new and after every
+       *  node edit (see LayersPanel / InspectorPanel). */
+      readonly type: "document:nodes";
+      readonly nodes: readonly DocNode[];
     };
 
 // ─── IPC — Main thread → Engine Worker ───────────────────────────────────────
@@ -207,6 +281,20 @@ export type MainToEngineMessage =
   | {
       /** Request the worker to serialise the current document and send it back. */
       readonly type: "document:request_save";
+    }
+  // ── Phase 6 Milestone 2 ─────────────────────────────────────────────────────
+  | {
+      /** Layers-panel click-to-select. Same payload shape as
+       *  selection:changed so both selection paths funnel through the
+       *  worker's one existing setSelection() function. */
+      readonly type: "selection:set";
+      readonly nodeIds: readonly NodeId[];
+    }
+  | {
+      /** Inspector edit — position, size, fill, stroke, or corner radius. */
+      readonly type: "node:update";
+      readonly nodeId: string;
+      readonly patch: NodePatch;
     };
 
 // ─── Performance constants ────────────────────────────────────────────────────

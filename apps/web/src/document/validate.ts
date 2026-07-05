@@ -98,10 +98,33 @@ export function assertValidDocumentData(data: unknown): asserts data is Document
     assertValidNode(node, i);
   });
 
-  // Structural consistency: every `children` entry must point at a node
-  // that exists and whose own `parent` points back. Catches a document
-  // that was hand-edited or corrupted into an inconsistent tree shape.
-  const byId = new Map<string, DocNode>((nodes as DocNode[]).map((n) => [n.id, n]));
+  // Structural consistency, part 1: node ids must be unique. A duplicate id
+  // would silently overwrite its predecessor in DocumentModel's Map while
+  // insertionOrder kept both entries — the same node rendered twice and a
+  // corrupted UUID↔engine-id mapping.
+  const byId = new Map<string, DocNode>();
+  for (const node of nodes as DocNode[]) {
+    if (byId.has(node.id)) {
+      throw new Error(`Invalid document: duplicate node id "${node.id}"`);
+    }
+    byId.set(node.id, node);
+  }
+
+  // Part 2: every non-null `parent` must reference a node that exists.
+  // (The reverse direction — children→parent backlinks — is checked below.)
+  // Without this, scene/rebuild.ts would have to invent a parent for the
+  // orphan, and the layers tree would drop it while the canvas still drew it.
+  for (const node of nodes as DocNode[]) {
+    if (node.parent !== null && !byId.has(node.parent)) {
+      throw new Error(
+        `Invalid document: node "${node.id}" references missing parent "${node.parent}"`
+      );
+    }
+  }
+
+  // Part 3: every `children` entry must point at a node that exists and
+  // whose own `parent` points back. Catches a document that was hand-edited
+  // or corrupted into an inconsistent tree shape.
   for (const node of nodes as DocNode[]) {
     for (const childId of node.children) {
       const child = byId.get(childId);

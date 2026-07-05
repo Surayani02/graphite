@@ -1,11 +1,17 @@
-import { useEngineContext } from "../context/EngineContext";
+import { useEngineContext, useEngineFrame } from "../context/EngineContext";
 
 function formatTime(d: Date): string {
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+/**
+ * The only component that subscribes to EngineFrameContext — it exists to
+ * display per-frame numbers, so re-rendering at frame cadence is its job,
+ * not a leak. Everything else in the shell reads the stable context.
+ */
 export function StatusBar() {
-  const { status, stats, viewport, lastSaved, selectedIds, error } = useEngineContext();
+  const { status, lastSaved, selectedIds, error } = useEngineContext();
+  const { stats, viewport } = useEngineFrame();
   const zoomPct = Math.round(viewport.zoom * 100);
 
   return (

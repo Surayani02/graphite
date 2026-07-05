@@ -140,6 +140,19 @@ export function EngineCanvas() {
       getPointerMods(e.nativeEvent)
     );
   };
+  // An interrupted pointer (pen leaving range, a browser gesture stealing
+  // the pointer, tab switch mid-drag) fires pointercancel and never
+  // pointerup — without this the worker stays in isDragging=true and the
+  // next bare pointermove keeps dragging with no button held.
+  const handlePointerCancel = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    setPointerDown(false);
+    sendPointerUp(
+      e.nativeEvent.offsetX,
+      e.nativeEvent.offsetY,
+      e.button,
+      getPointerMods(e.nativeEvent)
+    );
+  };
 
   return (
     <div role="region" aria-label="Graphite canvas" className="relative h-full w-full">
@@ -150,6 +163,7 @@ export function EngineCanvas() {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       />
     </div>
   );

@@ -1,9 +1,12 @@
 /**
- * EngineWorkerBridge — Phase 5
+ * EngineWorkerBridge — Phase 5, extended Phase 6 Milestone 2.
  *
  * Additions over Phase 4:
  *   - onDocumentState event
  *   - loadDocument(), newDocument(), requestSave() methods
+ * Additions over Phase 5 (Phase 6 M2):
+ *   - onDocumentNodes event
+ *   - setSelection(), updateNode() methods
  */
 
 import type {
@@ -12,7 +15,11 @@ import type {
   ToolType,
   PointerModifiers,
   KeyboardModifiers,
+  DocNode,
+  NodeId,
+  NodePatch,
 } from "@graphite/protocol";
+import { FpsTracker } from "./fps";
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -30,6 +37,8 @@ export interface EngineBridgeEvents {
   onViewportChanged: (x: number, y: number, zoom: number) => void;
   // Phase 5
   onDocumentState: (json: string) => void;
+  // Phase 6 Milestone 2
+  onDocumentNodes: (nodes: readonly DocNode[]) => void;
 }
 
 // ─── Class ────────────────────────────────────────────────────────────────────
@@ -38,9 +47,7 @@ export class EngineWorkerBridge {
   private readonly worker: Worker;
   private readonly handlers: Partial<EngineBridgeEvents> = {};
   private initialized = false;
-  private frameCount = 0;
-  private fpsWindowStart = performance.now();
-  private currentFps = 0;
+  private readonly fps = new FpsTracker();
 
   constructor() {
     this.worker = new Worker(new URL("../workers/engine.worker.ts", import.meta.url), {
@@ -182,6 +189,25 @@ export class EngineWorkerBridge {
     this.worker.postMessage({ type: "key:down", key, modifiers } satisfies MainToEngineMessage);
   }
 
+  // ── Layers / Inspector (Phase 6 Milestone 2) ──────────────────────────────
+
+  /** Layers-panel click-to-select. Empty array clears selection. */
+  setSelection(nodeIds: readonly string[]): void {
+    this.worker.postMessage({
+      type: "selection:set",
+      nodeIds: nodeIds as readonly NodeId[],
+    } satisfies MainToEngineMessage);
+  }
+
+  /** Inspector edit — position, size, fill, stroke, or corner radius. */
+  updateNode(nodeId: string, patch: NodePatch): void {
+    this.worker.postMessage({
+      type: "node:update",
+      nodeId,
+      patch,
+    } satisfies MainToEngineMessage);
+  }
+
   // ── Incoming messages ─────────────────────────────────────────────────────
 
   private handleWorkerMessage(msg: EngineToMainMessage): void {
@@ -191,18 +217,12 @@ export class EngineWorkerBridge {
         break;
       }
       case "frame:rendered": {
-        this.frameCount += 1;
-        const now = performance.now();
-        const elapsed = now - this.fpsWindowStart;
-        if (elapsed >= 1_000) {
-          this.currentFps = Math.round((this.frameCount / elapsed) * 1_000);
-          this.frameCount = 0;
-          this.fpsWindowStart = now;
-        }
         this.handlers.onStats?.({
           frameNumber: msg.frameNumber,
           renderTimeMs: msg.renderTimeMs,
-          fps: this.currentFps,
+          // QUAL-01: FpsTracker returns a provisional estimate during the
+          // first second instead of the old hard 0 — see engine/fps.ts.
+          fps: this.fps.record(performance.now()),
         });
         break;
       }
@@ -220,6 +240,10 @@ export class EngineWorkerBridge {
       }
       case "document:state": {
         this.handlers.onDocumentState?.(msg.json);
+        break;
+      }
+      case "document:nodes": {
+        this.handlers.onDocumentNodes?.(msg.nodes);
         break;
       }
       default:

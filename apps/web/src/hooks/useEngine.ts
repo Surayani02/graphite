@@ -1,7 +1,13 @@
 import { useCallback, useRef, useState } from "react";
 import { EngineWorkerBridge } from "../engine/bridge";
 import type { EngineStats } from "../engine/bridge";
-import type { ToolType, PointerModifiers, KeyboardModifiers } from "@graphite/protocol";
+import type {
+  ToolType,
+  PointerModifiers,
+  KeyboardModifiers,
+  DocNode,
+  NodePatch,
+} from "@graphite/protocol";
 import { DEFAULT_CAMERA } from "@graphite/protocol";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -36,6 +42,10 @@ export interface UseEngineResult {
   sendKeyDown: (key: string, mods: KeyboardModifiers) => void;
   // Document (Phase 5)
   requestSave: () => void;
+  // Layers / Inspector (Phase 6 Milestone 2)
+  nodes: readonly DocNode[];
+  setSelection: (nodeIds: readonly string[]) => void;
+  updateNode: (nodeId: string, patch: NodePatch) => void;
 }
 
 const DEFAULT_STATS: EngineStats = { frameNumber: 0, renderTimeMs: 0, fps: 0 };
@@ -55,6 +65,7 @@ export function useEngine(): UseEngineResult {
   const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [nodes, setNodes] = useState<readonly DocNode[]>([]);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -100,8 +111,20 @@ export function useEngine(): UseEngineResult {
       })
       .on("onDocumentState", (json) => {
         // Worker has serialised the document; persist it locally.
-        localStorage.setItem(STORAGE_KEY, json);
-        setLastSaved(new Date());
+        // setItem throws (QuotaExceededError) once the document outgrows
+        // the ~5MB localStorage budget — without the guard that exception
+        // escapes into the bridge's message handler and every subsequent
+        // save dies silently. lastSaved is deliberately NOT updated on
+        // failure: the HUD keeps showing the last save that actually stuck.
+        try {
+          localStorage.setItem(STORAGE_KEY, json);
+          setLastSaved(new Date());
+        } catch (err) {
+          console.error("[graphite] failed to persist document to localStorage:", err);
+        }
+      })
+      .on("onDocumentNodes", (n) => {
+        setNodes(n);
       });
 
     bridge.init(canvas);
@@ -147,6 +170,12 @@ export function useEngine(): UseEngineResult {
   const requestSave = useCallback(() => {
     bridgeRef.current?.requestSave();
   }, []);
+  const setSelection = useCallback((nodeIds: readonly string[]) => {
+    bridgeRef.current?.setSelection(nodeIds);
+  }, []);
+  const updateNode = useCallback((nodeId: string, patch: NodePatch) => {
+    bridgeRef.current?.updateNode(nodeId, patch);
+  }, []);
 
   return {
     initEngine,
@@ -163,5 +192,8 @@ export function useEngine(): UseEngineResult {
     sendWheel,
     sendKeyDown,
     requestSave,
+    nodes,
+    setSelection,
+    updateNode,
   };
 }

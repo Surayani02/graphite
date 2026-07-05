@@ -20,7 +20,17 @@ export function rebuildSceneFromDocument(state: EngineState): void {
   setSelection(state, null);
 
   for (const node of state.docModel.getNodesInOrder()) {
-    const parentEngineId = node.parent !== null ? (state.uuidToEngineId.get(node.parent) ?? 0) : 0;
+    // A non-null parent that hasn't been inserted yet can only mean a
+    // dangling reference (insertion order guarantees parents precede
+    // children, and validate.ts rejects missing parents on load). Skip the
+    // node rather than silently adopting it onto arena id 0 — a shape the
+    // layers tree can't show shouldn't be painted either.
+    let parentEngineId = 0;
+    if (node.parent !== null) {
+      const resolved = state.uuidToEngineId.get(node.parent);
+      if (resolved === undefined) continue;
+      parentEngineId = resolved;
+    }
 
     let engineId: number;
 

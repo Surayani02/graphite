@@ -2,6 +2,7 @@ import type { PointerModifiers } from "@graphite/protocol";
 import type { EngineState } from "../state";
 import { cssToWorld, notifyViewport } from "../camera";
 import { setSelection } from "../selection";
+import { postDocumentNodes } from "../scene/mutate";
 
 export function handlePointerDown(
   state: EngineState,
@@ -79,6 +80,14 @@ export function handlePointerMove(
 }
 
 export function handlePointerUp(state: EngineState): void {
+  if (state.dragMode === "move") {
+    // A move-drag may have changed this node's position (see
+    // handlePointerMove above) without ever notifying the panels — send
+    // the final state once here, rather than on every intermediate
+    // pointermove, which would re-serialise and re-post the whole node
+    // list at up to 60Hz. No-op (harmless) for a click with no movement.
+    postDocumentNodes(state);
+  }
   state.isDragging = false;
   state.dragMode = null;
 }

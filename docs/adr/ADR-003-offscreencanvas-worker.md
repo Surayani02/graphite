@@ -2,7 +2,7 @@
 
 **Date**: Phase 1
 **Status**: Accepted
-**Deciders**: Engineering Team
+**Deciders**: Surajit (Project Lead)
 
 ## Context
 

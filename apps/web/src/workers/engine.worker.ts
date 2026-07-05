@@ -30,9 +30,11 @@ import {
 import { startRenderLoop } from "./engine/gpu/render";
 import { buildDemoScene } from "./engine/scene/demo";
 import { rebuildSceneFromDocument } from "./engine/scene/rebuild";
+import { applyNodePatch, postDocumentNodes } from "./engine/scene/mutate";
 import { handleWheel, notifyViewport } from "./engine/camera";
 import { handlePointerDown, handlePointerMove, handlePointerUp } from "./engine/input/pointer";
 import { handleKeyDown } from "./engine/input/keyboard";
+import { setSelection } from "./engine/selection";
 
 const state = createInitialState();
 
@@ -55,9 +57,7 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
       try {
         await init();
         // eslint-disable-next-line no-console
-        console.info(
-          `[engine] WASM ready — graphite-engine v${version()} | Phase 5: Document Model`
-        );
+        console.info(`[engine] WASM ready — graphite-engine v${version()}`);
 
         await initWebGPU(state, msg.canvas);
         rebuildMainBindGroup(state);
@@ -95,6 +95,7 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
       uploadRenderList(state);
       notifyViewport(state);
       postDocumentState();
+      postDocumentNodes(state);
       break;
     }
 
@@ -114,6 +115,7 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
       // Echo back so the main thread's localStorage copy matches whatever
       // was actually loaded (including the demo-scene fallback above).
       postDocumentState();
+      postDocumentNodes(state);
       break;
     }
 
@@ -157,6 +159,25 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
 
     case "key:down": {
       handleKeyDown(state, msg.key);
+      break;
+    }
+
+    // ── Phase 6 Milestone 2 ───────────────────────────────────────────────
+
+    case "selection:set": {
+      // Layers-panel click-to-select carries stable document UUIDs; resolve
+      // to the ephemeral SceneGraph arena id and hand off to the same
+      // setSelection() pointer-driven selection already uses, so both
+      // paths update state.selectedId/selectedUuid identically and neither
+      // can leave the other out of sync.
+      const firstId = msg.nodeIds[0];
+      const engineId = firstId !== undefined ? (state.uuidToEngineId.get(firstId) ?? null) : null;
+      setSelection(state, engineId);
+      break;
+    }
+
+    case "node:update": {
+      applyNodePatch(state, msg.nodeId, msg.patch);
       break;
     }
 

@@ -169,6 +169,33 @@ impl SceneGraph {
         }
     }
 
+    // ── Phase 6 Milestone 2 additions ────────────────────────────────────────
+
+    /// Sets a node's fill colour. Mirrors `set_stroke`: matches on node
+    /// kind, silent no-op for `Frame` (no fill concept) or a missing id.
+    pub fn set_fill(&mut self, id: u32, r: u8, g: u8, b: u8, a: u8) {
+        let Some(Some(node)) = self.nodes.get_mut(id as usize) else {
+            return;
+        };
+        let color = Color { r, g, b, a };
+        match &mut node.kind {
+            NodeKind::Rect { fill, .. } => *fill = color,
+            NodeKind::Ellipse { fill, .. } => *fill = color,
+            NodeKind::Frame => {}
+        }
+    }
+
+    /// Resizes a node in place (top-left `x`/`y` unchanged). Mirrors
+    /// `set_node_position`: direct bounds mutation, silent no-op on a
+    /// missing id.
+    pub fn set_size(&mut self, id: u32, w: f32, h: f32) {
+        let Some(Some(node)) = self.nodes.get_mut(id as usize) else {
+            return;
+        };
+        node.bounds.w = w;
+        node.bounds.h = h;
+    }
+
     // ── Phase 4 additions ────────────────────────────────────────────────────
 
     /// Returns the id of the top-most renderable node hit at world `(x, y)`,
@@ -442,6 +469,82 @@ mod tests {
         g.set_corner_radius(id, 20.0);
         let (cx, cy, z, vw, vh) = wide_cam();
         assert!((g.get_render_list(cx, cy, z, vw, vh)[13] - 20.0).abs() < 1e-5);
+    }
+
+    // ── Phase 6 Milestone 2: set_fill / set_size ─────────────────────────────
+
+    #[test]
+    fn set_fill_updates_render_list_color() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
+        g.set_fill(id, 0, 255, 0, 128);
+        let (cx, cy, z, vw, vh) = wide_cam();
+        let list = g.get_render_list(cx, cy, z, vw, vh);
+        // Fill occupies floats [4..8): r, g, b, a, each normalised /255.
+        assert!((list[4] - 0.0).abs() < 1e-5);
+        assert!((list[5] - 1.0).abs() < 1e-5);
+        assert!((list[6] - 0.0).abs() < 1e-5);
+        assert!((list[7] - 128.0 / 255.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn set_fill_applies_to_ellipse() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_ellipse(f, 0.0, 0.0, 100.0, 80.0, 0, 0, 0, 255);
+        g.set_fill(id, 10, 20, 30, 255);
+        let (cx, cy, z, vw, vh) = wide_cam();
+        let list = g.get_render_list(cx, cy, z, vw, vh);
+        assert!((list[4] - 10.0 / 255.0).abs() < 1e-5);
+        assert!((list[5] - 20.0 / 255.0).abs() < 1e-5);
+        assert!((list[6] - 30.0 / 255.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn set_fill_on_nonexistent_id_is_no_op() {
+        let mut g = SceneGraph::new();
+        g.set_fill(999, 1, 2, 3, 4); // must not panic
+        assert_eq!(g.node_count(), 0);
+    }
+
+    #[test]
+    fn set_fill_on_frame_is_no_op() {
+        // Frame has no fill concept — must not panic, and must not somehow
+        // turn a Frame into a renderable shape.
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        g.set_fill(f, 255, 0, 0, 255);
+        let (cx, cy, z, vw, vh) = wide_cam();
+        assert!(g.get_render_list(cx, cy, z, vw, vh).is_empty());
+    }
+
+    #[test]
+    fn set_size_updates_bounds() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 10.0, 10.0, 20.0, 20.0, 255, 0, 0, 255);
+        g.set_size(id, 40.0, 50.0);
+        assert_eq!(g.get_node_bounds(id), vec![10.0, 10.0, 40.0, 50.0]);
+    }
+
+    #[test]
+    fn set_size_on_nonexistent_id_is_no_op() {
+        let mut g = SceneGraph::new();
+        g.set_size(999, 40.0, 50.0); // must not panic
+        assert_eq!(g.node_count(), 0);
+    }
+
+    #[test]
+    fn set_size_updates_hit_test() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 0.0, 0.0, 10.0, 10.0, 255, 0, 0, 255);
+        // Outside the original 10×10 box.
+        assert_eq!(g.hit_test(50.0, 50.0), None);
+        g.set_size(id, 100.0, 100.0);
+        // Now inside the grown box.
+        assert_eq!(g.hit_test(50.0, 50.0), Some(id));
     }
 
     #[test]

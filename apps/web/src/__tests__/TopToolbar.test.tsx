@@ -22,6 +22,9 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     sendWheel: vi.fn(),
     sendKeyDown: vi.fn(),
     requestSave: vi.fn(),
+    nodes: [],
+    setSelection: vi.fn(),
+    updateNode: vi.fn(),
     ...overrides,
   };
 }
