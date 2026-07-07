@@ -116,6 +116,20 @@ fn bench_hit_test(c: &mut Criterion) {
     });
 }
 
+// ─── Phase 6 Milestone 3 ────────────────────────────────────────────────────
+
+fn bench_remove_node(c: &mut Criterion) {
+    // Excludes graph construction from the timed portion — remove_node's own
+    // cost (tombstone + unlink_child) is what this measures, not add_rect.
+    c.bench_function("scene_graph::remove_node_1000", |b| {
+        b.iter_batched(
+            || build_mixed_grid(1_000),
+            |mut g| black_box(g.remove_node(500)),
+            criterion::BatchSize::SmallInput,
+        );
+    });
+}
+
 criterion_group!(
     benches,
     bench_version,
@@ -124,5 +138,6 @@ criterion_group!(
     bench_render_list_all_visible,
     bench_render_list_mostly_culled,
     bench_hit_test,
+    bench_remove_node,
 );
 criterion_main!(benches);

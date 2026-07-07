@@ -19,11 +19,36 @@
  */
 
 import type { SceneGraph } from "@graphite/engine";
-import { DEFAULT_CAMERA } from "@graphite/protocol";
+import { DEFAULT_CAMERA, type ToolType } from "@graphite/protocol";
 import type { DocumentModel } from "../../document/model";
 
-export type Tool = "select" | "pan";
-export type DragMode = "pan" | "move" | null;
+/**
+ * Phase 6 M3: was a locally-narrowed `"select" | "pan"` that the tool:set
+ * handler then had to collapse everything else onto — silently discarding
+ * "rectangle"/"ellipse" even though the protocol has declared them since
+ * Phase 0. `Tool` is now a straight alias of the protocol's own `ToolType`,
+ * so the worker can never again disagree with the contract about which
+ * tools exist; it only needs to decide which ones it *implements*
+ * (see input/pointer.ts).
+ */
+export type Tool = ToolType;
+export type DragMode = "pan" | "move" | "create" | null;
+
+/**
+ * In-progress rectangle/ellipse creation drag. `nodeId`/`engineId` are
+ * `null` until the pointer crosses the movement threshold (see
+ * scene/create.ts) — a plain click never allocates a throwaway node only
+ * to resize it once; nothing is created until there's an actual drag, or
+ * the drag ends (click = default size at the click point).
+ */
+export interface CreationDraft {
+  readonly tool: "rectangle" | "ellipse";
+  readonly frameId: string;
+  readonly anchorX: number;
+  readonly anchorY: number;
+  nodeId: string | null;
+  engineId: number | null;
+}
 
 export interface EngineState {
   // ── GPU resources ────────────────────────────────────────────────────────
@@ -71,6 +96,8 @@ export interface EngineState {
   selectedId: number | null;
   /** Document UUID of the selected node, or `null` if none. */
   selectedUuid: string | null;
+  /** Non-null exactly while a rectangle/ellipse drag is in progress. */
+  creation: CreationDraft | null;
 
   // ── Render loop ──────────────────────────────────────────────────────────
   running: boolean;
@@ -120,6 +147,7 @@ export function createInitialState(): EngineState {
     moveStartBoundsY: 0,
     selectedId: null,
     selectedUuid: null,
+    creation: null,
 
     running: false,
     frameNumber: 0,

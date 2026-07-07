@@ -1,15 +1,18 @@
 /**
  * @graphite/ui-core
  *
- * Core React UI components for the Graphite design editor.
- *
- * Phase 0: Typed stub. Full implementation starts in Phase 6.
- *
- * Planned:
- *   - Canvas overlay (selection handles, resize grips)  (Phase 6)
- *   - Toolbar                                           (Phase 6)
- *   - Layer panel                                       (Phase 6)
- *   - Properties panel                                  (Phase 6)
+ * Graphite's standalone design system: tokens (see `tokens.css`, imported
+ * separately by consuming apps) and accessible React primitives. Every
+ * primitive here is presentational + interaction-only — no engine, scene,
+ * document, or Zustand imports. See ADR-013 §4 (migration in) and ADR-014
+ * (Floating UI as the sole floating-layer dependency).
  */
 
-export const UI_CORE_VERSION = "0.1.0" as const;
+export const UI_CORE_VERSION = "0.2.0" as const;
+
+export { colorToHex, hexToColor } from "./color";
+export { NumberField } from "./components/NumberField";
+export { ColorField } from "./components/ColorField";
+export { Tooltip } from "./components/Tooltip";
+export { ContextMenu, useContextMenuState } from "./components/ContextMenu";
+export type { MenuItem, MenuPosition } from "./components/ContextMenu";

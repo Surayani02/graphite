@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { InspectorPanel } from "../components/InspectorPanel";
-import { EngineContext } from "../context/EngineContext";
+import { InspectorPanel } from "../features/inspector/InspectorPanel";
+import { EngineContext } from "../contexts/EngineContext";
 import { useUIStore } from "../stores/uiStore";
 import type { UseEngineResult } from "../hooks/useEngine";
 import type { DocNode } from "@graphite/protocol";
@@ -46,6 +46,8 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     nodes: [],
     setSelection: vi.fn(),
     updateNode: vi.fn(),
+    lastEngineTool: null,
+    deleteSelection: vi.fn(),
     ...overrides,
   };
 }

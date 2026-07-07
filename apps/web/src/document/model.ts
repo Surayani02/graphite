@@ -181,6 +181,39 @@ export class DocumentModel {
     this._version++;
   }
 
+  /**
+   * Removes a node — leaf shapes only (rect/ellipse). Refuses (returns
+   * `false`, no mutation, no version bump) if the id doesn't exist or
+   * still has children: cascading a frame's contents is a data-loss
+   * operation with no undo system yet to protect it, so Phase 6 M3
+   * doesn't offer it. The Rust SceneGraph's own `remove_node` enforces
+   * the identical rule independently — neither side trusts the other to
+   * have checked first.
+   *
+   * On success, also removes the id from its parent's `children` array
+   * (if any) so no dangling reference survives into the next
+   * serialise/rebuild cycle — the exact class of corruption
+   * `validate.ts` checks for on load.
+   */
+  removeNode(id: string): boolean {
+    const node = this.nodeMap.get(id);
+    if (!node) return false;
+    if (node.children.length > 0) return false;
+
+    if (node.parent !== null) {
+      const parent = this.nodeMap.get(node.parent);
+      if (parent) {
+        parent.children = parent.children.filter((childId) => childId !== id);
+      }
+    }
+
+    this.nodeMap.delete(id);
+    const index = this.insertionOrder.indexOf(id);
+    if (index !== -1) this.insertionOrder.splice(index, 1);
+    this._version++;
+    return true;
+  }
+
   // ── Queries ────────────────────────────────────────────────────────────────
 
   /**

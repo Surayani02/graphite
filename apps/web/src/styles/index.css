@@ -1,39 +1,44 @@
 @import "tailwindcss";
-
-/**
- * Design tokens — Phase 6 Milestone 1.
- *
- * Colour, radius, and font tokens only. Layout-specific dimensions (panel
- * widths, toolbar height) use Tailwind's built-in spacing scale or
- * arbitrary values directly in JSX rather than inventing a custom
- * `--spacing-*` namespace per dimension — keeps the token surface small
- * and avoids guessing at generated utility-class names for one-off sizes.
+/*
+ * Tailwind v4 only scans this app's own tree by default — a package
+ * living outside it (packages/ui-core) is invisible to content detection
+ * unless explicitly registered. Without this, any utility class used
+ * *only* inside a ui-core component (not also coincidentally used
+ * somewhere in apps/web) is silently never generated — confirmed
+ * empirically: cursor-pointer appeared to "work" from ColorField.tsx, but
+ * only because LayersPanel.tsx happens to use the same class; shadow-lg,
+ * used only inside Tooltip.tsx/ContextMenu.tsx, did not generate at all
+ * until this directive was added. This is documented, expected v4
+ * behaviour in a monorepo, not a bug in ui-core or in Tailwind.
  */
-@theme {
-    --color-surface-canvas: #0f1016;
-    --color-surface-panel: #16181f;
-    --color-surface-panel-hover: #1c1f28;
-    --color-border-subtle: rgb(255 255 255 / 8%);
-    --color-content-primary: rgb(255 255 255 / 92%);
-    --color-content-secondary: rgb(255 255 255 / 60%);
-    --color-content-tertiary: rgb(255 255 255 / 38%);
-    --color-accent: #1677ff;
-    --color-accent-hover: #3b8aff;
-    --color-danger: #ff6b6b;
-
-    --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-}
+@source "../../../../packages/ui-core/src";
+/*
+ * NOT `@import "@graphite/ui-core/tokens.css"`: that bare-specifier +
+ * subpath form is correctly declared in ui-core's package.json `exports`
+ * map, but @tailwindcss/vite's own CSS import resolver does not honour
+ * exports-map subpaths the way Vite's JS resolver does — it resolves the
+ * bare specifier to the package's "." entry (./src/index.ts, a *file*)
+ * and then appends the requested subpath onto that, producing the
+ * nonsensical path .../src/index.ts/tokens.css. Confirmed against a real
+ * build failure (ENOENT on that exact path) and matches publicly reported
+ * cases of the same class of bug with Tailwind v4 in pnpm monorepos where
+ * a package's CSS lives at a subpath alongside a separate JS/TS main
+ * entry. A relative filesystem path sidesteps package resolution
+ * entirely, which every CSS tool — Tailwind's included — handles
+ * identically and reliably.
+ */
+@import "../../../../packages/ui-core/src/tokens.css";
 
 html,
 body,
 #root {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
-    -webkit-font-smoothing: antialiased;
+  -webkit-font-smoothing: antialiased;
 }

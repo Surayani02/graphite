@@ -1,15 +1,16 @@
-import { useUIStore, selectEffectiveTool } from "../stores/uiStore";
-import { useEngineContext } from "../context/EngineContext";
-import type { ToolType } from "@graphite/protocol";
+import { useEngineContext } from "../contexts/EngineContext";
 
-const TOOLS: ReadonlyArray<{ tool: ToolType; label: string; title: string }> = [
-  { tool: "select", label: "V", title: "Select (V)" },
-  { tool: "pan", label: "H", title: "Pan (H)" },
-];
-
+/**
+ * Top toolbar — Phase 6 M1, slimmed to document-level actions in M3.
+ *
+ * The Select/Pan tool buttons that lived here in M1 have moved to
+ * `features/tools/ToolsRail`, alongside the new Rectangle/Ellipse
+ * creation tools — one place owns "which tool is active" UI, rather than
+ * splitting it across two toolbars. What's left here is document-scoped,
+ * not tool-scoped: the wordmark and Save, with more document actions
+ * (export, undo/redo) joining at their own milestones.
+ */
 export function TopToolbar() {
-  const setActiveTool = useUIStore((s) => s.setActiveTool);
-  const effectiveTool = useUIStore(selectEffectiveTool);
   const { requestSave, status } = useEngineContext();
 
   return (
@@ -17,27 +18,6 @@ export function TopToolbar() {
       <span className="font-mono text-xs font-semibold tracking-wide text-content-secondary">
         Graphite
       </span>
-
-      <div className="ml-4 flex items-center gap-1 rounded-md bg-surface-canvas/60 p-1">
-        {TOOLS.map(({ tool, label, title }) => (
-          <button
-            key={tool}
-            type="button"
-            title={title}
-            aria-pressed={effectiveTool === tool}
-            onClick={() => {
-              setActiveTool(tool);
-            }}
-            className={`rounded px-2.5 py-1 font-mono text-xs transition-colors ${
-              effectiveTool === tool
-                ? "bg-accent font-semibold text-white"
-                : "text-content-secondary hover:bg-surface-panel-hover"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       <div className="flex-1" />
 

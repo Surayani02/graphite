@@ -2,7 +2,7 @@
 
 Open-source, browser-based, high-performance collaborative graphics platform.
 
-> **Status**: 🔨 Phase 6 — UI Shell in progress. Milestones 1–2 complete (design tokens, app shell, Layers + Inspector panels); Milestones 3–5 (tools & shape creation, command palette, routing/theming, a11y + E2E exit gate) remaining.
+> **Status**: 🔨 Phase 6 — UI Shell in progress. Milestones 1–3 complete (design tokens, app shell, Layers + Inspector panels, tools rail with shape creation, leaf-shape deletion, context menus); Milestones 4–5 (command palette, routing/theming, a11y + E2E exit gate) remaining.
 
 ## Prerequisites
 
@@ -67,7 +67,7 @@ graphite/
 | 3     | Path rendering (GPU)               | ✅ Complete |
 | 4     | Interaction (select, pan, zoom)    | ✅ Complete |
 | 5     | Document model                     | ✅ Complete |
-| 6     | UI shell                           | 🔨 M1–M2 ✅ |
+| 6     | UI shell                           | 🔨 M1–M3 ✅ |
 | 7     | **MVP** (export, save/load)        | ⏳          |
 | 8     | Backend                            | ⏳          |
 | 9     | Collaboration (CRDT + WebSocket)   | ⏳          |

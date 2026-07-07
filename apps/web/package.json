@@ -17,6 +17,8 @@
   "dependencies": {
     "@graphite/engine": "workspace:*",
     "@graphite/protocol": "workspace:*",
+    "@graphite/ui-core": "workspace:*",
+    "lucide-react": "^1.23.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "zustand": "^5.0.14"

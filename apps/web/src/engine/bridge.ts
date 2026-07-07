@@ -1,5 +1,5 @@
 /**
- * EngineWorkerBridge — Phase 5, extended Phase 6 Milestone 2.
+ * EngineWorkerBridge — Phase 5, extended Phase 6 Milestones 2–3.
  *
  * Additions over Phase 4:
  *   - onDocumentState event
@@ -7,6 +7,10 @@
  * Additions over Phase 5 (Phase 6 M2):
  *   - onDocumentNodes event
  *   - setSelection(), updateNode() methods
+ * Additions over M2 (Phase 6 M3):
+ *   - onToolChanged event (worker-initiated tool change, e.g. auto-return
+ *     to "select" after a shape commits)
+ *   - deleteSelection() method
  */
 
 import type {
@@ -39,6 +43,8 @@ export interface EngineBridgeEvents {
   onDocumentState: (json: string) => void;
   // Phase 6 Milestone 2
   onDocumentNodes: (nodes: readonly DocNode[]) => void;
+  // Phase 6 Milestone 3
+  onToolChanged: (tool: ToolType) => void;
 }
 
 // ─── Class ────────────────────────────────────────────────────────────────────
@@ -208,6 +214,14 @@ export class EngineWorkerBridge {
     } satisfies MainToEngineMessage);
   }
 
+  // ── Tools & deletion (Phase 6 Milestone 3) ────────────────────────────────
+
+  /** Canvas/Layers-row context-menu "Delete". The keyboard Delete/Backspace
+   *  path goes through sendKeyDown instead — see keyboard.ts. */
+  deleteSelection(): void {
+    this.worker.postMessage({ type: "document:delete_selection" } satisfies MainToEngineMessage);
+  }
+
   // ── Incoming messages ─────────────────────────────────────────────────────
 
   private handleWorkerMessage(msg: EngineToMainMessage): void {
@@ -244,6 +258,10 @@ export class EngineWorkerBridge {
       }
       case "document:nodes": {
         this.handlers.onDocumentNodes?.(msg.nodes);
+        break;
+      }
+      case "tool:changed": {
+        this.handlers.onToolChanged?.(msg.tool);
         break;
       }
       default:

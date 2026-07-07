@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useEngineContext } from "../context/EngineContext";
+import { Trash2 } from "lucide-react";
+import { ContextMenu, useContextMenuState, type MenuItem } from "@graphite/ui-core";
+import { useEngineContext } from "../contexts/EngineContext";
 import { useUIStore, selectEffectiveTool } from "../stores/uiStore";
 import { useSyncToolWithEngine } from "../hooks/useSyncToolWithEngine";
 import type { PointerModifiers } from "@graphite/protocol";
@@ -21,6 +23,8 @@ function isEditableTarget(target: EventTarget | null): boolean {
  * Phase 6: trimmed to canvas + input wiring only. The toolbar and stats
  * HUD that used to float on top of this component are now docked panels
  * in AppShell (TopToolbar, StatusBar) reading the same engine context.
+ * M3 adds: R/O tool shortcuts alongside V/H, Delete/Backspace forwarding,
+ * and a right-click context menu.
  */
 export function EngineCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,6 +36,8 @@ export function EngineCanvas() {
     sendWheel,
     sendKeyDown,
     requestSave,
+    selectedIds,
+    deleteSelection,
   } = useEngineContext();
 
   const setActiveTool = useUIStore((s) => s.setActiveTool);
@@ -40,6 +46,7 @@ export function EngineCanvas() {
 
   const [isPointerDown, setPointerDown] = useState(false);
   const spaceDownRef = useRef(false);
+  const menu = useContextMenuState();
 
   useSyncToolWithEngine();
 
@@ -88,8 +95,18 @@ export function EngineCanvas() {
           setActiveTool("pan");
           return;
         }
+        if (e.key === "r" || e.key === "R") {
+          setActiveTool("rectangle");
+          return;
+        }
+        if (e.key === "o" || e.key === "O") {
+          setActiveTool("ellipse");
+          return;
+        }
       }
-      if (e.key === "Escape") sendKeyDown("Escape", mods);
+      if (e.key === "Escape" || e.key === "Delete" || e.key === "Backspace") {
+        sendKeyDown(e.key, mods);
+      }
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
@@ -154,6 +171,26 @@ export function EngineCanvas() {
     );
   };
 
+  // Menu content is real commands only (see M3 scope: leaf-shape deletion
+  // is the only canvas command that exists yet) — no selection, no menu,
+  // rather than a menu with everything disabled.
+  const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    if (selectedIds.length === 0) return;
+    menu.show(e.clientX, e.clientY);
+  };
+
+  const menuItems: MenuItem[] = [
+    {
+      id: "delete",
+      label: "Delete",
+      icon: Trash2,
+      shortcut: "Del",
+      danger: true,
+      onSelect: deleteSelection,
+    },
+  ];
+
   return (
     <div role="region" aria-label="Graphite canvas" className="relative h-full w-full">
       <canvas
@@ -164,6 +201,13 @@ export function EngineCanvas() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
+        onContextMenu={handleContextMenu}
+      />
+      <ContextMenu
+        open={menu.open}
+        position={menu.position}
+        items={menuItems}
+        onClose={menu.close}
       />
     </div>
   );

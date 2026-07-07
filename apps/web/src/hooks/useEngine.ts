@@ -46,6 +46,13 @@ export interface UseEngineResult {
   nodes: readonly DocNode[];
   setSelection: (nodeIds: readonly string[]) => void;
   updateNode: (nodeId: string, patch: NodePatch) => void;
+  // Tools & deletion (Phase 6 Milestone 3)
+  /** Worker-initiated tool change (e.g. auto-return to "select" after a
+   *  shape commits) — read by useSyncToolWithEngine to keep the Zustand
+   *  store in sync with a decision the engine made, not the user. `null`
+   *  until the first such change occurs this session. */
+  lastEngineTool: ToolType | null;
+  deleteSelection: () => void;
 }
 
 const DEFAULT_STATS: EngineStats = { frameNumber: 0, renderTimeMs: 0, fps: 0 };
@@ -66,6 +73,7 @@ export function useEngine(): UseEngineResult {
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [nodes, setNodes] = useState<readonly DocNode[]>([]);
+  const [lastEngineTool, setLastEngineTool] = useState<ToolType | null>(null);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -125,6 +133,9 @@ export function useEngine(): UseEngineResult {
       })
       .on("onDocumentNodes", (n) => {
         setNodes(n);
+      })
+      .on("onToolChanged", (tool) => {
+        setLastEngineTool(tool);
       });
 
     bridge.init(canvas);
@@ -176,6 +187,9 @@ export function useEngine(): UseEngineResult {
   const updateNode = useCallback((nodeId: string, patch: NodePatch) => {
     bridgeRef.current?.updateNode(nodeId, patch);
   }, []);
+  const deleteSelection = useCallback(() => {
+    bridgeRef.current?.deleteSelection();
+  }, []);
 
   return {
     initEngine,
@@ -195,5 +209,7 @@ export function useEngine(): UseEngineResult {
     nodes,
     setSelection,
     updateNode,
+    lastEngineTool,
+    deleteSelection,
   };
 }

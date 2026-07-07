@@ -1,0 +1,35 @@
+/**
+ * @graphite/ui-core design tokens.
+ *
+ * Moved out of apps/web (Phase 6 M1) in M3, per ADR-013 §4 — the design
+ * system is standalone from here on, consumable by any future app or
+ * plugin host without dragging the editor along. Values are unchanged
+ * from M1; only the token *surface* grows here, with each addition tied
+ * to an actual consumer in the same milestone that adds it (M3: a visible
+ * focus ring and one elevation level for floating menus/tooltips — not a
+ * speculative full typography/motion scale nothing yet uses).
+ *
+ * Colour, radius, and font tokens only. Layout-specific dimensions (panel
+ * widths, toolbar height) use Tailwind's built-in spacing scale or
+ * arbitrary values directly in JSX rather than inventing a custom
+ * `--spacing-*` namespace per dimension.
+ */
+@theme {
+  --color-surface-canvas: #0f1016;
+  --color-surface-panel: #16181f;
+  --color-surface-panel-hover: #1c1f28;
+  --color-border-subtle: rgb(255 255 255 / 8%);
+  /* M3: the focus-ring colour every interactive primitive uses — never
+     suppressed, per the accessibility standard. Distinct from -subtle so a
+     focus ring is never mistaken for an ordinary panel divider. */
+  --color-border-focus: #1677ff;
+  --color-content-primary: rgb(255 255 255 / 92%);
+  --color-content-secondary: rgb(255 255 255 / 60%);
+  --color-content-tertiary: rgb(255 255 255 / 38%);
+  --color-accent: #1677ff;
+  --color-accent-hover: #3b8aff;
+  --color-danger: #ff6b6b;
+
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+}

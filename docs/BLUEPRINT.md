@@ -2,7 +2,7 @@
 
 Condensed architecture reference. Decisions live in [`adr/`](./adr/); this
 document is the map. Supersedes the v1 blueprint (2026-06-30) — updated
-2026-07-05 for the Charter v2 frontend mandates and the Phase 6 M2 state.
+2026-07-06 for the Phase 6 M3 state.
 
 ## What Graphite is
 
@@ -48,16 +48,16 @@ stays off (ADR-003).
 
 ## Packages
 
-| Package               | Role                                                                | Status                                                     |
-| --------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `apps/web`            | Editor application (Vite + React)                                   | Active                                                     |
-| `apps/server`         | Backend (Rust + Axum)                                               | Stub, Phase 8                                              |
-| `packages/protocol`   | IPC + network contracts, `Color`, camera/zoom constants             | Active                                                     |
-| `packages/engine`     | Rust scene graph + geometry, compiled to WASM                       | Active                                                     |
-| `packages/document`   | Placeholder — see [ADR-010](./adr/ADR-010-document-crate-status.md) | Inert                                                      |
-| `packages/crdt`       | CRDT collaboration engine (Yjs)                                     | Stub, Phase 9                                              |
-| `packages/ui-core`    | Standalone design system: tokens + primitives                       | Stub — M2 primitives migrate here at M3 entry (ADR-013 §4) |
-| `packages/plugin-api` | Sandboxed plugin system                                             | Stub, Phase 10+                                            |
+| Package               | Role                                                                | Status                                                          |
+| --------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `apps/web`            | Editor application (Vite + React)                                   | Active                                                          |
+| `apps/server`         | Backend (Rust + Axum)                                               | Stub, Phase 8                                                   |
+| `packages/protocol`   | IPC + network contracts, `Color`, camera/zoom constants             | Active                                                          |
+| `packages/engine`     | Rust scene graph + geometry, compiled to WASM                       | Active                                                          |
+| `packages/document`   | Placeholder — see [ADR-010](./adr/ADR-010-document-crate-status.md) | Inert                                                           |
+| `packages/crdt`       | CRDT collaboration engine (Yjs)                                     | Stub, Phase 9                                                   |
+| `packages/ui-core`    | Standalone design system: tokens + primitives                       | Live — M2 primitives + Tooltip/ContextMenu (M3), per ADR-013 §4 |
+| `packages/plugin-api` | Sandboxed plugin system                                             | Stub, Phase 10+                                                 |
 
 ## Phases and milestones
 
@@ -72,7 +72,8 @@ stays off (ADR-003).
 
 Phase 6 milestones: **M1** design tokens + app shell (✅) · **M2** Layers +
 Inspector (✅) · **M3** tools rail, rectangle/ellipse creation tools,
-lucide-react icons, Floating UI + React Aria context menus/tooltips ·
+lucide-react icons, Floating UI context menus/tooltips, leaf-shape
+deletion (✅) ·
 **M4** command palette, remappable shortcut registry, search, assets tab ·
 **M5** TanStack Router (`/settings`), theming (light + `forced-colors`),
 `PanelDescriptor` registry, Playwright E2E, full a11y audit — **M5 is the
@@ -100,8 +101,10 @@ Zustand 5 (UI intent only) · Vitest 4 + RTL · ESLint 10 (`tseslint.strict`,
 zero warnings) · Prettier · pnpm 11 + Turborepo · Rust stable → wasm-bindgen
 (`wasm-pack --target web`) · Criterion.
 
-Gated (latest versions verified at adoption): lucide-react, Floating UI,
-React Aria behaviors → **M3** · TanStack Router, Playwright → **M5** ·
+Live (added M3): lucide-react, `@floating-ui/react` (ADR-014 — the sole
+floating-layer dependency this milestone; React Aria deferred to M4's
+command-palette combobox). Gated (latest versions verified at adoption):
+TanStack Router, Playwright → **M5** ·
 React Hook Form + Zod → first submission-style form (M5 Settings; scope per
 ADR-013 §3) · TanStack Query, Axum, PostgreSQL, Redis, JWT → **Phase 8** ·
 Yjs → **Phase 9**. Rejected: Next.js / any meta-framework for the editor
@@ -128,9 +131,10 @@ state never enter React. Crossings are named hooks only.
 `/` editor · `/settings` (M5) · `/plugins` (P10) · `/account` (P8) ·
 `/docs/*` (future).
 
-**File organization.** Feature folders from M3 (`features/inspector`,
-`features/layers`, `features/tools`, …) as new surfaces land; directories
-materialise with their first occupant, never empty. ~250-line file budget.
+**File organization.** Feature folders adopted M3 (`features/tools`,
+`features/layers`, `features/inspector`); `contexts/` renamed from
+`context/` in the same milestone. More folders (`providers/`, `routes/`)
+materialise with their first M5 occupant. ~250-line file budget, unchanged.
 
 **Accessibility.** Keyboard-first: every interactive element reachable and
 operable (the Layers tree is the accessible representation of the canvas —

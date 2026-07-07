@@ -222,6 +222,16 @@ export type EngineToMainMessage =
        *  node edit (see LayersPanel / InspectorPanel). */
       readonly type: "document:nodes";
       readonly nodes: readonly DocNode[];
+    }
+  // ── Phase 6 Milestone 3 ─────────────────────────────────────────────────────
+  | {
+      /** Worker-initiated tool change — e.g. auto-return to "select" after
+       *  a shape-creation drag commits. Distinct from tool:set (below),
+       *  which is the main→worker direction: this exists so
+       *  useSyncToolWithEngine can keep the Zustand store's activeTool in
+       *  sync with a decision the *engine* made, not the user. */
+      readonly type: "tool:changed";
+      readonly tool: ToolType;
     };
 
 // ─── IPC — Main thread → Engine Worker ───────────────────────────────────────
@@ -295,6 +305,15 @@ export type MainToEngineMessage =
       readonly type: "node:update";
       readonly nodeId: string;
       readonly patch: NodePatch;
+    }
+  // ── Phase 6 Milestone 3 ─────────────────────────────────────────────────────
+  | {
+      /** Deletes the worker's current selection (leaf shapes only — a
+       *  frame with children is refused; see DocumentModel.removeNode).
+       *  Triggered by the canvas/Layers-row context menu. The keyboard
+       *  Delete/Backspace path reuses the existing key:down message
+       *  instead — see workers/engine/input/keyboard.ts. */
+      readonly type: "document:delete_selection";
     };
 
 // ─── Performance constants ────────────────────────────────────────────────────

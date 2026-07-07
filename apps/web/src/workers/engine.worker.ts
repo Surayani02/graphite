@@ -35,6 +35,7 @@ import { handleWheel, notifyViewport } from "./engine/camera";
 import { handlePointerDown, handlePointerMove, handlePointerUp } from "./engine/input/pointer";
 import { handleKeyDown } from "./engine/input/keyboard";
 import { setSelection } from "./engine/selection";
+import { deleteSelection } from "./engine/scene/remove";
 
 const state = createInitialState();
 
@@ -127,7 +128,10 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
     // ── Tool ───────────────────────────────────────────────────────────────
 
     case "tool:set": {
-      state.activeTool = msg.tool === "pan" ? "pan" : "select";
+      // Phase 6 M3: was `msg.tool === "pan" ? "pan" : "select"`, silently
+      // discarding rectangle/ellipse — Tool is now a straight ToolType
+      // alias (state.ts), so there is nothing left to collapse.
+      state.activeTool = msg.tool;
       break;
     }
 
@@ -144,7 +148,7 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
     }
 
     case "pointer:up": {
-      handlePointerUp(state);
+      handlePointerUp(state, msg.x, msg.y, msg.modifiers);
       break;
     }
 
@@ -178,6 +182,13 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
 
     case "node:update": {
       applyNodePatch(state, msg.nodeId, msg.patch);
+      break;
+    }
+
+    // ── Phase 6 Milestone 3 ───────────────────────────────────────────────
+
+    case "document:delete_selection": {
+      deleteSelection(state);
       break;
     }
 

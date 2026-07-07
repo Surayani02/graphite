@@ -18,7 +18,11 @@ use crate::scene::node::{NodeId, NodeKind, SceneNode};
 /// contract. A `roots` field previously existed here but was write-only —
 /// populated by `add_frame`, never read — so it has been removed rather
 /// than carried as dead weight that misleads future contributors into
-/// thinking it drives traversal order.
+/// thinking it drives traversal order. `children` (on `SceneNode`, below)
+/// was in the same write-only state until Phase 6 M3's `remove_node`
+/// started reading and maintaining it (leaf-only removal needs to check
+/// "does this node have children", and keeping a removed node's id out of
+/// its former parent's list) — it stays, now genuinely earning its keep.
 #[wasm_bindgen]
 pub struct SceneGraph {
     nodes: Vec<Option<SceneNode>>,
@@ -196,6 +200,44 @@ impl SceneGraph {
         node.bounds.h = h;
     }
 
+    // ── Phase 6 Milestone 3 additions ────────────────────────────────────────
+
+    /// Removes a node, tombstoning its arena slot (ADR-008: ids are never
+    /// reused, so this never invalidates a *different* still-live id).
+    ///
+    /// Refuses (returns `false`, no mutation) if the id doesn't exist, is
+    /// already removed, or — the deliberate M3 scope limit — still has
+    /// children: cascading a frame's contents is a data-loss operation this
+    /// milestone has no undo system to protect, so it is simply not offered
+    /// yet (the TypeScript `DocumentModel.removeNode` enforces the same
+    /// leaf-only rule; this mirrors it so a caller that skipped the
+    /// document-model check for some reason still can't corrupt the graph).
+    ///
+    /// On success, also removes the id from its parent's `children` — a
+    /// dangling child reference would sit inertly today (nothing reads
+    /// `children` yet, see the struct doc comment) but would silently
+    /// corrupt whatever future traversal feature starts reading it, which
+    /// is exactly the class of bug `document/validate.ts` exists to catch
+    /// on the TypeScript side. `node_count()` decrements; frame-count
+    /// bookkeeping needs no change since only leaves are removable here.
+    pub fn remove_node(&mut self, id: u32) -> bool {
+        let Some(Some(node)) = self.nodes.get(id as usize) else {
+            return false;
+        };
+        if !node.children.is_empty() {
+            return false;
+        }
+        let parent = node.parent;
+
+        self.nodes[id as usize] = None;
+        self.count -= 1;
+
+        if let Some(parent_id) = parent {
+            self.unlink_child(parent_id.0, NodeId(id));
+        }
+        true
+    }
+
     // ── Phase 4 additions ────────────────────────────────────────────────────
 
     /// Returns the id of the top-most renderable node hit at world `(x, y)`,
@@ -337,6 +379,12 @@ impl SceneGraph {
     fn link_child(&mut self, parent_id: u32, child_id: NodeId) {
         if let Some(Some(p)) = self.nodes.get_mut(parent_id as usize) {
             p.children.push(child_id);
+        }
+    }
+
+    fn unlink_child(&mut self, parent_id: u32, child_id: NodeId) {
+        if let Some(Some(p)) = self.nodes.get_mut(parent_id as usize) {
+            p.children.retain(|&c| c != child_id);
         }
     }
 
@@ -526,6 +574,86 @@ mod tests {
         let id = g.add_rect(f, 10.0, 10.0, 20.0, 20.0, 255, 0, 0, 255);
         g.set_size(id, 40.0, 50.0);
         assert_eq!(g.get_node_bounds(id), vec![10.0, 10.0, 40.0, 50.0]);
+    }
+
+    // ── Phase 6 Milestone 3: remove_node ─────────────────────────────────────
+
+    #[test]
+    fn remove_node_decrements_count() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 0.0, 0.0, 10.0, 10.0, 255, 0, 0, 255);
+        assert_eq!(g.node_count(), 2);
+        assert!(g.remove_node(id));
+        assert_eq!(g.node_count(), 1);
+    }
+
+    #[test]
+    fn remove_node_excludes_the_node_from_hit_test() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
+        assert_eq!(g.hit_test(50.0, 50.0), Some(id));
+        g.remove_node(id);
+        assert_eq!(g.hit_test(50.0, 50.0), None);
+    }
+
+    #[test]
+    fn remove_node_excludes_the_node_from_render_list() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
+        g.remove_node(id);
+        let (cx, cy, z, vw, vh) = wide_cam();
+        assert!(g.get_render_list(cx, cy, z, vw, vh).is_empty());
+    }
+
+    #[test]
+    fn remove_node_on_nonexistent_id_is_no_op_and_returns_false() {
+        let mut g = SceneGraph::new();
+        assert!(!g.remove_node(999)); // must not panic
+        assert_eq!(g.node_count(), 0);
+    }
+
+    #[test]
+    fn remove_node_twice_returns_false_the_second_time() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 0.0, 0.0, 10.0, 10.0, 255, 0, 0, 255);
+        assert!(g.remove_node(id));
+        assert!(!g.remove_node(id));
+        assert_eq!(g.node_count(), 1); // only the frame remains
+    }
+
+    #[test]
+    fn remove_node_refuses_a_frame_with_children() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        g.add_rect(f, 0.0, 0.0, 10.0, 10.0, 255, 0, 0, 255);
+        assert!(!g.remove_node(f));
+        assert_eq!(g.node_count(), 2); // nothing was removed
+    }
+
+    #[test]
+    fn remove_node_allows_the_frame_once_its_only_child_is_gone() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id = g.add_rect(f, 0.0, 0.0, 10.0, 10.0, 255, 0, 0, 255);
+        assert!(g.remove_node(id));
+        assert!(g.remove_node(f));
+        assert_eq!(g.node_count(), 0);
+    }
+
+    #[test]
+    fn remove_node_never_reuses_the_freed_id() {
+        // ADR-008: ids are allocated monotonically and never reused, even
+        // after a remove — the next add must not collide with a tombstone.
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let id_a = g.add_rect(f, 0.0, 0.0, 10.0, 10.0, 255, 0, 0, 255);
+        g.remove_node(id_a);
+        let id_b = g.add_rect(f, 0.0, 0.0, 10.0, 10.0, 0, 255, 0, 255);
+        assert_ne!(id_a, id_b);
     }
 
     #[test]

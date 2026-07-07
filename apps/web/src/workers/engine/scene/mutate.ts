@@ -3,6 +3,47 @@ import type { EngineState } from "../state";
 import { post } from "../messaging";
 
 /**
+ * Writes position and/or size to SceneGraph *and* DocumentModel, with no
+ * clamping and no `document:nodes` broadcast. Two separate functions
+ * rather than one combined `writeGeometry` deliberately: drag-move
+ * (`input/pointer.ts`) only ever changes position, never size, and
+ * `DocumentModel.setSize`/`setNodePosition` each unconditionally bump
+ * `_version` — a combined helper would force drag-move to also bump
+ * version for size on every move, for a value that never changed.
+ * Creation's live-resize (`scene/create.ts`) calls both together, since it
+ * genuinely changes both at once.
+ *
+ * Both are un-clamped (creation always starts at `cornerRadius: 0`, so
+ * there's nothing to re-clamp mid-drag) and un-broadcast (called at up to
+ * 60Hz during a drag; callers broadcast once when the drag ends — see
+ * `postDocumentNodes` below, `pointer.ts`'s `handlePointerUp`, and
+ * `create.ts`'s `commitCreation`). `applyNodePatch` below is the only
+ * caller that also needs the corner-radius clamp and the broadcast; it
+ * applies those itself, after calling these.
+ */
+export function writePosition(
+  state: EngineState,
+  nodeId: string | null,
+  engineId: number | undefined,
+  x: number,
+  y: number
+): void {
+  if (nodeId !== null) state.docModel?.setNodePosition(nodeId, x, y);
+  if (engineId !== undefined) state.sceneGraph?.set_node_position(engineId, x, y);
+}
+
+export function writeSize(
+  state: EngineState,
+  nodeId: string | null,
+  engineId: number | undefined,
+  w: number,
+  h: number
+): void {
+  if (nodeId !== null) state.docModel?.setSize(nodeId, w, h);
+  if (engineId !== undefined) state.sceneGraph?.set_size(engineId, w, h);
+}
+
+/**
  * Applies an Inspector-panel patch to one node.
  *
  * SceneGraph first (immediate re-render), then DocumentModel (persistence)
@@ -23,10 +64,7 @@ export function applyNodePatch(state: EngineState, nodeId: string, patch: NodePa
   const engineId = state.uuidToEngineId.get(nodeId);
 
   if (patch.x !== undefined || patch.y !== undefined) {
-    const x = patch.x ?? node.x;
-    const y = patch.y ?? node.y;
-    state.docModel.setNodePosition(nodeId, x, y);
-    if (engineId !== undefined) state.sceneGraph?.set_node_position(engineId, x, y);
+    writePosition(state, nodeId, engineId, patch.x ?? node.x, patch.y ?? node.y);
   }
 
   // Effective size after this patch — also the clamp bound for corner radius.
@@ -35,8 +73,7 @@ export function applyNodePatch(state: EngineState, nodeId: string, patch: NodePa
   const sizeChanged = patch.w !== undefined || patch.h !== undefined;
 
   if (sizeChanged) {
-    state.docModel.setSize(nodeId, w, h);
-    if (engineId !== undefined) state.sceneGraph?.set_size(engineId, w, h);
+    writeSize(state, nodeId, engineId, w, h);
   }
 
   if (patch.fill !== undefined) {

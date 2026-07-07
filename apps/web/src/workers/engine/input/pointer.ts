@@ -2,7 +2,8 @@ import type { PointerModifiers } from "@graphite/protocol";
 import type { EngineState } from "../state";
 import { cssToWorld, notifyViewport } from "../camera";
 import { setSelection } from "../selection";
-import { postDocumentNodes } from "../scene/mutate";
+import { writePosition, postDocumentNodes } from "../scene/mutate";
+import { beginCreation, updateCreation, commitCreation } from "../scene/create";
 
 export function handlePointerDown(
   state: EngineState,
@@ -11,6 +12,12 @@ export function handlePointerDown(
   button: number,
   _modifiers: PointerModifiers
 ): void {
+  if (state.activeTool === "rectangle" || state.activeTool === "ellipse") {
+    const [wx, wy] = cssToWorld(state, cssX, cssY);
+    beginCreation(state, state.activeTool, wx, wy);
+    return;
+  }
+
   if (state.activeTool === "pan" || button === 1) {
     state.dragMode = "pan";
     state.isDragging = true;
@@ -26,7 +33,7 @@ export function handlePointerDown(
   const [wx, wy] = cssToWorld(state, cssX, cssY);
   // BUG-05: hit_test returns `number | undefined` (wasm-bindgen's mapping
   // of Rust's Option<u32>), not the previous -1 sentinel. `undefined`
-  // reads as "no hit" with no magic-number comparison required.
+  // reads as \"no hit\" with no magic-number comparison required.
   const hitId = state.sceneGraph.hit_test(wx, wy);
 
   if (hitId !== undefined) {
@@ -52,8 +59,14 @@ export function handlePointerMove(
   state: EngineState,
   cssX: number,
   cssY: number,
-  _modifiers: PointerModifiers
+  modifiers: PointerModifiers
 ): void {
+  if (state.dragMode === "create") {
+    const [wx, wy] = cssToWorld(state, cssX, cssY);
+    updateCreation(state, wx, wy, modifiers.shift);
+    return;
+  }
+
   if (!state.isDragging || state.dragMode === null) return;
 
   if (state.dragMode === "pan") {
@@ -68,18 +81,29 @@ export function handlePointerMove(
     const newX = state.moveStartBoundsX + (wx - state.moveStartWorldX);
     const newY = state.moveStartBoundsY + (wy - state.moveStartWorldY);
 
-    // Update the renderer immediately for a responsive drag...
-    state.sceneGraph.set_node_position(state.selectedId, newX, newY);
-    // ...and keep the document (source of truth) in sync. A full scene
-    // rebuild per drag-move event would be far too slow at scale, so both
-    // are updated directly here instead of going through rebuildSceneFromDocument.
-    if (state.selectedUuid !== null) {
-      state.docModel?.setNodePosition(state.selectedUuid, newX, newY);
-    }
+    // Update the renderer immediately for a responsive drag; the document
+    // (source of truth) is kept in sync the same way — see writePosition's
+    // doc comment for why a full scene rebuild per drag-move isn't done.
+    // selectedUuid can in principle be null even with a selectedId set (no
+    // reverse engineId→uuid mapping) — writePosition's nodeId is nullable
+    // for exactly this: the scene graph still updates, the document simply
+    // has nothing to write to.
+    writePosition(state, state.selectedUuid, state.selectedId, newX, newY);
   }
 }
 
-export function handlePointerUp(state: EngineState): void {
+export function handlePointerUp(
+  state: EngineState,
+  cssX: number,
+  cssY: number,
+  modifiers: PointerModifiers
+): void {
+  if (state.dragMode === "create") {
+    const [wx, wy] = cssToWorld(state, cssX, cssY);
+    commitCreation(state, wx, wy, modifiers.shift);
+    return;
+  }
+
   if (state.dragMode === "move") {
     // A move-drag may have changed this node's position (see
     // handlePointerMove above) without ever notifying the panels — send

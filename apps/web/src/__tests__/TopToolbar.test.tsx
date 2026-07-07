@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { TopToolbar } from "../components/TopToolbar";
-import { EngineContext } from "../context/EngineContext";
-import { useUIStore } from "../stores/uiStore";
+import { EngineContext } from "../contexts/EngineContext";
 import type { UseEngineResult } from "../hooks/useEngine";
 
 function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
@@ -25,6 +24,8 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     nodes: [],
     setSelection: vi.fn(),
     updateNode: vi.fn(),
+    lastEngineTool: null,
+    deleteSelection: vi.fn(),
     ...overrides,
   };
 }
@@ -37,27 +38,15 @@ function renderWithEngine(value: UseEngineResult) {
   );
 }
 
-beforeEach(() => {
-  useUIStore.setState({ activeTool: "select", spaceDown: false });
-});
-
+/**
+ * Tool-button behaviour (Select/Pan pressed state, clicking Pan, keyboard
+ * shortcuts) moved to ToolsRail.test.tsx in Phase 6 M3 along with the
+ * buttons themselves — TopToolbar is document-scoped only now.
+ */
 describe("TopToolbar", () => {
-  it("renders both tool buttons", () => {
+  it("renders the wordmark", () => {
     renderWithEngine(mockEngine());
-    expect(screen.getByTitle("Select (V)")).toBeInTheDocument();
-    expect(screen.getByTitle("Pan (H)")).toBeInTheDocument();
-  });
-
-  it("marks the active tool as pressed", () => {
-    renderWithEngine(mockEngine());
-    expect(screen.getByTitle("Select (V)")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTitle("Pan (H)")).toHaveAttribute("aria-pressed", "false");
-  });
-
-  it("clicking the Pan button updates the UI store", () => {
-    renderWithEngine(mockEngine());
-    fireEvent.click(screen.getByTitle("Pan (H)"));
-    expect(useUIStore.getState().activeTool).toBe("pan");
+    expect(screen.getByText("Graphite")).toBeInTheDocument();
   });
 
   it("clicking Save calls requestSave", () => {
@@ -70,5 +59,10 @@ describe("TopToolbar", () => {
   it("disables Save while the engine is not running", () => {
     renderWithEngine(mockEngine({ status: "initializing" }));
     expect(screen.getByTitle("Save (Ctrl+S)")).toBeDisabled();
+  });
+
+  it("no longer renders tool buttons (moved to ToolsRail)", () => {
+    renderWithEngine(mockEngine());
+    expect(screen.queryByTitle(/Select|Pan/)).not.toBeInTheDocument();
   });
 });

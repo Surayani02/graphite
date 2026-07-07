@@ -460,3 +460,71 @@ describe("DocumentModel.fromJson — structural validation", () => {
     );
   });
 });
+
+// ─── removeNode (Phase 6 M3) ───────────────────────────────────────────────────
+
+describe("DocumentModel.removeNode", () => {
+  function makeDoc() {
+    const doc = new DocumentModel("Test");
+    doc.addFrame("f1", 0, 0, 800, 600);
+    doc.addRect("r1", "f1", 10, 20, 100, 80, FILL);
+    return doc;
+  }
+
+  it("removes a leaf node and returns true", () => {
+    const doc = makeDoc();
+    expect(doc.removeNode("r1")).toBe(true);
+    expect(doc.getNode("r1")).toBeUndefined();
+    expect(doc.nodeCount).toBe(1);
+  });
+
+  it("removes the id from its parent's children array", () => {
+    const doc = makeDoc();
+    doc.removeNode("r1");
+    expect(doc.getNode("f1")?.children).toEqual([]);
+  });
+
+  it("removes the id from insertion order (getNodesInOrder no longer includes it)", () => {
+    const doc = makeDoc();
+    doc.removeNode("r1");
+    expect(doc.getNodesInOrder().map((n) => n.id)).toEqual(["f1"]);
+  });
+
+  it("bumps _version on success", () => {
+    const doc = makeDoc();
+    const before = doc.version;
+    doc.removeNode("r1");
+    expect(doc.version).toBe(before + 1);
+  });
+
+  it("returns false and does not mutate for an unknown id", () => {
+    const doc = makeDoc();
+    const before = doc.version;
+    expect(doc.removeNode("ghost")).toBe(false);
+    expect(doc.version).toBe(before);
+    expect(doc.nodeCount).toBe(2);
+  });
+
+  it("refuses to remove a frame that still has children", () => {
+    const doc = makeDoc();
+    const before = doc.version;
+    expect(doc.removeNode("f1")).toBe(false);
+    expect(doc.version).toBe(before);
+    expect(doc.getNode("f1")).toBeDefined();
+  });
+
+  it("allows removing the frame once its only child is gone", () => {
+    const doc = makeDoc();
+    doc.removeNode("r1");
+    expect(doc.removeNode("f1")).toBe(true);
+    expect(doc.nodeCount).toBe(0);
+  });
+
+  it("removing one sibling leaves the other intact and in place", () => {
+    const doc = makeDoc();
+    doc.addEllipse("e1", "f1", 0, 0, 10, 10, FILL);
+    doc.removeNode("r1");
+    expect(doc.getNode("e1")).toBeDefined();
+    expect(doc.getNode("f1")?.children).toEqual(["e1"]);
+  });
+});

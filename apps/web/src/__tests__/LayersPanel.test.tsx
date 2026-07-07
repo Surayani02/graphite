@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { LayersPanel } from "../components/LayersPanel";
-import { EngineContext } from "../context/EngineContext";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { LayersPanel } from "../features/layers/LayersPanel";
+import { EngineContext } from "../contexts/EngineContext";
 import { useUIStore } from "../stores/uiStore";
 import type { UseEngineResult } from "../hooks/useEngine";
 import type { DocNode } from "@graphite/protocol";
@@ -46,6 +46,8 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     nodes: [],
     setSelection: vi.fn(),
     updateNode: vi.fn(),
+    lastEngineTool: null,
+    deleteSelection: vi.fn(),
     ...overrides,
   };
 }
@@ -189,5 +191,42 @@ describe("LayersPanel — keyboard", () => {
     fireEvent.keyDown(tree, { key: "End" });
     fireEvent.keyDown(tree, { key: " " });
     expect(setSelection).toHaveBeenCalledWith(["e1"]);
+  });
+});
+
+// ─── Context menu (M3 closeout) ────────────────────────────────────────────────
+
+describe("LayersPanel — context menu", () => {
+  it("right-clicking a leaf row selects it and opens the menu", async () => {
+    const setSelection = vi.fn();
+    renderWithEngine(mockEngine({ nodes: [makeNode({ id: "r1" })], setSelection }));
+    fireEvent.contextMenu(screen.getByText("Rect"), { clientX: 10, clientY: 10 });
+    expect(setSelection).toHaveBeenCalledWith(["r1"]);
+    await act(async () => {});
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+  });
+
+  it("does nothing when right-clicking a frame row", () => {
+    const setSelection = vi.fn();
+    renderWithEngine(
+      mockEngine({
+        nodes: [makeNode({ id: "f1", kind: "frame", name: "Frame" })],
+        setSelection,
+      })
+    );
+    fireEvent.contextMenu(screen.getByText("Frame"), { clientX: 10, clientY: 10 });
+    expect(setSelection).not.toHaveBeenCalled();
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("Delete in the menu calls deleteSelection", async () => {
+    const deleteSelection = vi.fn();
+    renderWithEngine(
+      mockEngine({ nodes: [makeNode({ id: "r1" })], selectedIds: ["r1"], deleteSelection })
+    );
+    fireEvent.contextMenu(screen.getByText("Rect"), { clientX: 10, clientY: 10 });
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("menuitem", { name: /Delete/ }));
+    expect(deleteSelection).toHaveBeenCalledTimes(1);
   });
 });

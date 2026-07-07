@@ -24,7 +24,13 @@ headline numbers into the summary.
 
 ## Baselines
 
-| Date | Milestone | insert_10k | render_list_10k | hit_test_10k | doc setNodePosition ×1k | Notes |
-| ---- | --------- | ---------- | --------------- | ------------ | ----------------------- | ----- |
+| Date | Milestone | insert_10k | render_list_10k | hit_test_10k | remove_node_1k | doc setNodePosition ×1k | Notes |
+| ---- | --------- | ---------- | --------------- | ------------ | -------------- | ----------------------- | ----- |
 
-_First row lands with the M2 commit._
+_No row committed yet — `cargo bench` requires a real Rust toolchain
+(1.96 stable), which no sandboxed session in this project's history has
+had access to. Every milestone through M3 has queued this as the same
+outstanding action: run the commands above on the reference machine and
+commit the first row. `bench_remove_node` (M3) is included in the column
+set above so it's captured whenever that run happens, rather than needing
+a second baseline pass later._
