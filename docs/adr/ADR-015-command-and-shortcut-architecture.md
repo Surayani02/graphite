@@ -41,11 +41,11 @@ produced character. Display formatting follows platform convention
 also mirrors the live chord as `aria-keyshortcuts`.
 
 **4. Resolution and collision policy** (`shortcutMap.ts`). An override
-replaces *all* of a command's defaults — one chord or `null` (explicitly
+replaces _all_ of a command's defaults — one chord or `null` (explicitly
 unbound); an invalid persisted string resolves to unbound rather than
 resurrecting a default the user moved away from. Overridden bindings claim
 chords before defaults (an explicit choice beats a shipped default); a
-shadowed default drops out of *both* maps so the UI never advertises a
+shadowed default drops out of _both_ maps so the UI never advertises a
 chord that would run something else. The store keeps overrides unique at
 write time; builtin-default uniqueness is enforced by test.
 

@@ -1,6 +1,6 @@
 # Phase 6 — Milestone 4 benchmarks
 
-Recorded 2026-07-07 at the M4 commit. Numbers below marked *indicative* come
+Recorded 2026-07-07 at the M4 commit. Numbers below marked _indicative_ come
 from the sandboxed build environment (Node 22); per
 [README.md](./README.md), canonical baselines are recorded on the reference
 machine — append reference rows with the commands given.
@@ -40,18 +40,18 @@ build → press mod+K, Escape, ×10 → in the DevTools console:
 performance.getEntriesByName("graphite:palette-open").map((e) => Math.round(e.duration));
 ```
 
-| Date | Machine | Median | Max | Notes |
-| ---- | ------- | ------ | --- | ----- |
-| —    | reference run pending | | | record on first M4 session |
+| Date | Machine               | Median | Max | Notes                      |
+| ---- | --------------------- | ------ | --- | -------------------------- |
+| —    | reference run pending |        |     | record on first M4 session |
 
 ## Production bundle delta (react-aria-components adoption)
 
 `vite build`, minified sizes, main chunk:
 
-| Asset            | M3 baseline            | M4                      | Δ                        |
-| ---------------- | ---------------------- | ----------------------- | ------------------------ |
-| `index-*.js`     | 283.13 kB (90.99 gzip) | 455.94 kB (142.93 gzip) | **+172.81 (+51.94 gzip)** |
-| `index-*.css`    | 15.40 kB (3.82 gzip)   | 17.77 kB (4.25 gzip)    | +2.37 (+0.43 gzip)       |
-| `engine.worker`  | 21.27 kB               | 21.27 kB                | 0                        |
+| Asset           | M3 baseline            | M4                      | Δ                         |
+| --------------- | ---------------------- | ----------------------- | ------------------------- |
+| `index-*.js`    | 283.13 kB (90.99 gzip) | 455.94 kB (142.93 gzip) | **+172.81 (+51.94 gzip)** |
+| `index-*.css`   | 15.40 kB (3.82 gzip)   | 17.77 kB (4.25 gzip)    | +2.37 (+0.43 gzip)        |
+| `engine.worker` | 21.27 kB               | 21.27 kB                | 0                         |
 
 Justification and the code-splitting watch item: ADR-015 §Consequences.

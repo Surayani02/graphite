@@ -40,11 +40,11 @@ export function LayersPanel() {
   // The stored active row may have been deleted or belong to a previous
   // document — fall back to the current selection, then to nothing.
   const effectiveActiveId =
-      activeId !== null && selectableIds.includes(activeId)
-          ? activeId
-          : selectedId !== undefined && selectableIds.includes(selectedId)
-              ? selectedId
-              : null;
+    activeId !== null && selectableIds.includes(activeId)
+      ? activeId
+      : selectedId !== undefined && selectableIds.includes(selectedId)
+        ? selectedId
+        : null;
 
   // Reveal-on-select: selection can change without the tree being touched
   // (canvas click, palette layer search) — bring the row into view so the
@@ -112,42 +112,40 @@ export function LayersPanel() {
   ];
 
   return (
-      <div className="flex h-full flex-col">
-        <div
-            role="tree"
-            aria-label="Layer tree"
-            tabIndex={0}
-            aria-activedescendant={
-              effectiveActiveId !== null ? rowDomId(effectiveActiveId) : undefined
-            }
-            onKeyDown={onTreeKeyDown}
-            className="flex-1 overflow-y-auto py-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/60"
-        >
-          {tree.length === 0 ? (
-              <div className="px-2 py-1 font-mono text-[11px] text-content-tertiary">
-                No layers yet.
-              </div>
-          ) : (
-              tree.map((root) => (
-                  <LayerRow
-                      key={root.node.id}
-                      treeNode={root}
-                      depth={0}
-                      selectedId={selectedId}
-                      activeId={effectiveActiveId}
-                      onSelect={select}
-                      onContextMenu={onRowContextMenu}
-                  />
-              ))
-          )}
-        </div>
-        <ContextMenu
-            open={menu.open}
-            position={menu.position}
-            items={menuItems}
-            onClose={menu.close}
-        />
+    <div className="flex h-full flex-col">
+      <div
+        role="tree"
+        aria-label="Layer tree"
+        tabIndex={0}
+        aria-activedescendant={effectiveActiveId !== null ? rowDomId(effectiveActiveId) : undefined}
+        onKeyDown={onTreeKeyDown}
+        className="flex-1 overflow-y-auto py-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/60"
+      >
+        {tree.length === 0 ? (
+          <div className="px-2 py-1 font-mono text-[11px] text-content-tertiary">
+            No layers yet.
+          </div>
+        ) : (
+          tree.map((root) => (
+            <LayerRow
+              key={root.node.id}
+              treeNode={root}
+              depth={0}
+              selectedId={selectedId}
+              activeId={effectiveActiveId}
+              onSelect={select}
+              onContextMenu={onRowContextMenu}
+            />
+          ))
+        )}
       </div>
+      <ContextMenu
+        open={menu.open}
+        position={menu.position}
+        items={menuItems}
+        onClose={menu.close}
+      />
+    </div>
   );
 }
 
@@ -163,56 +161,56 @@ interface LayerRowProps {
 }
 
 function LayerRow({
-                    treeNode,
-                    depth,
-                    selectedId,
-                    activeId,
-                    onSelect,
-                    onContextMenu,
-                  }: LayerRowProps) {
+  treeNode,
+  depth,
+  selectedId,
+  activeId,
+  onSelect,
+  onContextMenu,
+}: LayerRowProps) {
   const { node, children } = treeNode;
   const isFrame = node.kind === "frame";
   const isSelected = node.id === selectedId;
   const isActive = node.id === activeId;
 
   return (
-      <>
-        <div
-            id={rowDomId(node.id)}
-            role="treeitem"
-            aria-selected={isSelected}
-            onClick={() => {
-              if (!isFrame) onSelect(node.id);
-            }}
-            onContextMenu={(e) => {
-              if (isFrame) return;
-              e.preventDefault();
-              onContextMenu(node.id, e.clientX, e.clientY);
-            }}
-            style={{ paddingLeft: `${8 + depth * 14}px` }}
-            className={`flex h-6 items-center gap-1.5 pr-2 font-mono text-[11px] ${
-                isFrame
-                    ? "cursor-default font-semibold text-content-secondary"
-                    : "cursor-pointer text-content-tertiary hover:bg-surface-panel-hover"
-            } ${isSelected ? "bg-accent/20 text-content-primary" : ""} ${
-                isActive ? "ring-1 ring-inset ring-accent/70" : ""
-            }`}
-        >
-          <span className="w-3 shrink-0 text-center opacity-60">{kindIcon(node.kind)}</span>
-          <span className="truncate">{node.name}</span>
-        </div>
-        {children.map((child) => (
-            <LayerRow
-                key={child.node.id}
-                treeNode={child}
-                depth={depth + 1}
-                selectedId={selectedId}
-                activeId={activeId}
-                onSelect={onSelect}
-                onContextMenu={onContextMenu}
-            />
-        ))}
-      </>
+    <>
+      <div
+        id={rowDomId(node.id)}
+        role="treeitem"
+        aria-selected={isSelected}
+        onClick={() => {
+          if (!isFrame) onSelect(node.id);
+        }}
+        onContextMenu={(e) => {
+          if (isFrame) return;
+          e.preventDefault();
+          onContextMenu(node.id, e.clientX, e.clientY);
+        }}
+        style={{ paddingLeft: `${8 + depth * 14}px` }}
+        className={`flex h-6 items-center gap-1.5 pr-2 font-mono text-[11px] ${
+          isFrame
+            ? "cursor-default font-semibold text-content-secondary"
+            : "cursor-pointer text-content-tertiary hover:bg-surface-panel-hover"
+        } ${isSelected ? "bg-accent/20 text-content-primary" : ""} ${
+          isActive ? "ring-1 ring-inset ring-accent/70" : ""
+        }`}
+      >
+        <span className="w-3 shrink-0 text-center opacity-60">{kindIcon(node.kind)}</span>
+        <span className="truncate">{node.name}</span>
+      </div>
+      {children.map((child) => (
+        <LayerRow
+          key={child.node.id}
+          treeNode={child}
+          depth={depth + 1}
+          selectedId={selectedId}
+          activeId={activeId}
+          onSelect={onSelect}
+          onContextMenu={onContextMenu}
+        />
+      ))}
+    </>
   );
 }
 
