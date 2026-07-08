@@ -4,27 +4,22 @@ import { ContextMenu, useContextMenuState, type MenuItem } from "@graphite/ui-co
 import { useEngineContext } from "../contexts/EngineContext";
 import { useUIStore, selectEffectiveTool } from "../stores/uiStore";
 import { useSyncToolWithEngine } from "../hooks/useSyncToolWithEngine";
+import { useCommandShortcut } from "../features/shortcuts/useResolvedShortcuts";
 import type { PointerModifiers } from "@graphite/protocol";
 
 function getPointerMods(e: PointerEvent | WheelEvent): PointerModifiers {
   return { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey };
 }
 
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target.isContentEditable
-  );
-}
-
 /**
- * Phase 6: trimmed to canvas + input wiring only. The toolbar and stats
- * HUD that used to float on top of this component are now docked panels
- * in AppShell (TopToolbar, StatusBar) reading the same engine context.
- * M3 adds: R/O tool shortcuts alongside V/H, Delete/Backspace forwarding,
- * and a right-click context menu.
+ * Phase 6: canvas + pointer/wheel wiring only. The toolbar and stats HUD
+ * that used to float on top of this component are docked panels in
+ * AppShell (M1); the global keyboard listener that lived here through M3
+ * (tool letters, mod+S, Space-pan, Escape/Delete forwarding) moved to
+ * features/shortcuts/ShortcutProvider in M4 — one owner for global keys,
+ * driven by the command registry (ADR-015). What remains is strictly
+ * pointer-coupled: pointer/wheel forwarding, cursor, the save-on-hide
+ * hook, and the right-click context menu.
  */
 export function EngineCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,18 +29,15 @@ export function EngineCanvas() {
     sendPointerMove,
     sendPointerUp,
     sendWheel,
-    sendKeyDown,
     requestSave,
     selectedIds,
     deleteSelection,
   } = useEngineContext();
 
-  const setActiveTool = useUIStore((s) => s.setActiveTool);
-  const setSpaceDown = useUIStore((s) => s.setSpaceDown);
   const effectiveTool = useUIStore(selectEffectiveTool);
+  const deleteShortcut = useCommandShortcut("edit.deleteSelection");
 
   const [isPointerDown, setPointerDown] = useState(false);
-  const spaceDownRef = useRef(false);
   const menu = useContextMenuState();
 
   useSyncToolWithEngine();
@@ -64,65 +56,6 @@ export function EngineCanvas() {
     globalThis.document.addEventListener("visibilitychange", handler);
     return () => globalThis.document.removeEventListener("visibilitychange", handler);
   }, [requestSave]);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (isEditableTarget(e.target)) return;
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        requestSave();
-        return;
-      }
-
-      if (e.key === " ") {
-        e.preventDefault();
-        if (!spaceDownRef.current) {
-          spaceDownRef.current = true;
-          setSpaceDown(true);
-        }
-        return;
-      }
-
-      const mods = { shift: e.shiftKey, ctrl: e.ctrlKey, alt: e.altKey, meta: e.metaKey };
-
-      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (e.key === "v" || e.key === "V") {
-          setActiveTool("select");
-          return;
-        }
-        if (e.key === "h" || e.key === "H") {
-          setActiveTool("pan");
-          return;
-        }
-        if (e.key === "r" || e.key === "R") {
-          setActiveTool("rectangle");
-          return;
-        }
-        if (e.key === "o" || e.key === "O") {
-          setActiveTool("ellipse");
-          return;
-        }
-      }
-      if (e.key === "Escape" || e.key === "Delete" || e.key === "Backspace") {
-        sendKeyDown(e.key, mods);
-      }
-    };
-
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === " ") {
-        spaceDownRef.current = false;
-        setSpaceDown(false);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-    };
-  }, [setActiveTool, setSpaceDown, sendKeyDown, requestSave]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -185,9 +118,10 @@ export function EngineCanvas() {
       id: "delete",
       label: "Delete",
       icon: Trash2,
-      shortcut: "Del",
       danger: true,
       onSelect: deleteSelection,
+      // Live chord (M4): rebinding Delete in the recorder updates this label.
+      ...(deleteShortcut !== null ? { shortcut: deleteShortcut.label } : {}),
     },
   ];
 

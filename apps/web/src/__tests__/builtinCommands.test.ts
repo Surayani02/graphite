@@ -1,0 +1,103 @@
+import { describe, expect, it, vi } from "vitest";
+import { builtinCommands, ensureBuiltinCommands } from "../features/commands/builtin";
+import { createCommandRegistry } from "../features/commands/registry";
+import { type CommandContext } from "../features/commands/types";
+import { normalizeChord } from "../features/shortcuts/chord";
+
+function fakeContext(selectedIds: readonly string[] = []): CommandContext {
+  return {
+    engine: {
+      selectedIds,
+      setSelection: vi.fn(),
+      deleteSelection: vi.fn(),
+      requestSave: vi.fn(),
+      updateNode: vi.fn(),
+    },
+    ui: {
+      setActiveTool: vi.fn(),
+      toggleLeftPanel: vi.fn(),
+      toggleInspector: vi.fn(),
+      openPalette: vi.fn(),
+      setLeftPanelTab: vi.fn(),
+      openShortcutRecorder: vi.fn(),
+    },
+  };
+}
+
+describe("builtinCommands", () => {
+  it("has globally unique ids", () => {
+    const ids = builtinCommands.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("every default chord is valid and no two commands' defaults collide", () => {
+    const claimed = new Map<string, string>();
+    for (const command of builtinCommands) {
+      for (const raw of command.defaultChords ?? []) {
+        const chord = normalizeChord(raw);
+        expect(chord, `${command.id} declares invalid default "${raw}"`).not.toBeNull();
+        if (chord === null) continue;
+        const holder = claimed.get(chord);
+        expect(
+          holder,
+          `"${chord}" claimed by both ${holder ?? ""} and ${command.id}`
+        ).toBeUndefined();
+        claimed.set(chord, command.id);
+      }
+    }
+  });
+
+  it("ensureBuiltinCommands is idempotent per registry", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    ensureBuiltinCommands(registry);
+    expect(registry.list()).toHaveLength(builtinCommands.length);
+  });
+
+  it("tool commands set the matching UI tool", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    for (const [id, tool] of [
+      ["tool.select", "select"],
+      ["tool.pan", "pan"],
+      ["tool.rectangle", "rectangle"],
+      ["tool.ellipse", "ellipse"],
+    ] as const) {
+      const ctx = fakeContext();
+      expect(registry.execute(id, ctx)).toBe(true);
+      expect(ctx.ui.setActiveTool).toHaveBeenCalledExactlyOnceWith(tool);
+    }
+  });
+
+  it("edit.deleteSelection is gated on selection and routes to the semantic engine path", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    const empty = fakeContext([]);
+    expect(registry.execute("edit.deleteSelection", empty)).toBe(false);
+    expect(empty.engine.deleteSelection).not.toHaveBeenCalled();
+    const withSelection = fakeContext(["n1"]);
+    expect(registry.execute("edit.deleteSelection", withSelection)).toBe(true);
+    expect(withSelection.engine.deleteSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it("file and view commands drive the right capability", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+
+    const save = fakeContext();
+    registry.execute("file.save", save);
+    expect(save.engine.requestSave).toHaveBeenCalledTimes(1);
+
+    const palette = fakeContext();
+    registry.execute("view.commandPalette", palette);
+    expect(palette.ui.openPalette).toHaveBeenCalledTimes(1);
+
+    const assets = fakeContext();
+    registry.execute("view.assetsTab", assets);
+    expect(assets.ui.setLeftPanelTab).toHaveBeenCalledExactlyOnceWith("assets");
+
+    const recorder = fakeContext();
+    registry.execute("help.changeShortcut", recorder);
+    expect(recorder.ui.openShortcutRecorder).toHaveBeenCalledTimes(1);
+  });
+});

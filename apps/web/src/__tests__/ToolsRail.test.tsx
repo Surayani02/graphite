@@ -4,6 +4,11 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ToolsRail } from "../features/tools/ToolsRail";
 import { useUIStore } from "../stores/uiStore";
 
+import { ensureBuiltinCommands } from "../features/commands/builtin";
+
+// Live chords (M4): titles/aria-keyshortcuts resolve from the registry.
+ensureBuiltinCommands();
+
 beforeEach(() => {
   useUIStore.setState({ activeTool: "select", spaceDown: false });
 });

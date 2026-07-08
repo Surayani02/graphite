@@ -1,25 +1,29 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { MousePointer2, Hand, Square, Circle, type LucideIcon } from "lucide-react";
 import { Tooltip } from "@graphite/ui-core";
 import type { ToolType } from "@graphite/protocol";
 import { useUIStore, selectEffectiveTool } from "../../stores/uiStore";
+import { type CommandId } from "../commands/types";
+import { detectChordPlatform, formatChord, toAriaKeyshortcuts } from "../shortcuts/chord";
+import { useResolvedShortcuts } from "../shortcuts/useResolvedShortcuts";
 
 interface ToolSpec {
   readonly tool: ToolType;
   readonly label: string;
-  readonly shortcut: string;
+  /** The command that switches to this tool — its live chord labels the button. */
+  readonly commandId: CommandId;
   readonly icon: LucideIcon;
 }
 
 const TOOLS: readonly ToolSpec[] = [
-  { tool: "select", label: "Select", shortcut: "V", icon: MousePointer2 },
-  { tool: "pan", label: "Pan", shortcut: "H", icon: Hand },
-  { tool: "rectangle", label: "Rectangle", shortcut: "R", icon: Square },
-  { tool: "ellipse", label: "Ellipse", shortcut: "O", icon: Circle },
+  { tool: "select", label: "Select", commandId: "tool.select", icon: MousePointer2 },
+  { tool: "pan", label: "Pan", commandId: "tool.pan", icon: Hand },
+  { tool: "rectangle", label: "Rectangle", commandId: "tool.rectangle", icon: Square },
+  { tool: "ellipse", label: "Ellipse", commandId: "tool.ellipse", icon: Circle },
 ] as const;
 
 /**
- * Left tools rail — Phase 6 M3.
+ * Left tools rail — Phase 6 M3; chords made live in M4.
  *
  * Select/Pan move here from TopToolbar (which slims to document-level
  * actions only); Rectangle/Ellipse are new. ARIA `toolbar` pattern: one
@@ -29,10 +33,16 @@ const TOOLS: readonly ToolSpec[] = [
  * `selectEffectiveTool`, not `activeTool` directly, so holding Space
  * visually highlights Pan without touching what's *stored* as the user's
  * chosen tool.
+ *
+ * Tooltip and `aria-keyshortcuts` labels come from the resolved shortcut
+ * map, not hardcoded letters (M4): rebinding a tool in the recorder
+ * updates every affordance, and an unbound tool simply shows no chord.
  */
 export function ToolsRail() {
   const setActiveTool = useUIStore((s) => s.setActiveTool);
   const effectiveTool = useUIStore(selectEffectiveTool);
+  const resolved = useResolvedShortcuts();
+  const platform = useMemo(() => detectChordPlatform(), []);
   const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -60,15 +70,22 @@ export function ToolsRail() {
       onKeyDown={onKeyDown}
       className="flex w-9 flex-col items-center gap-1 border-r border-border-subtle bg-surface-panel py-2"
     >
-      {TOOLS.map(({ tool, label, shortcut, icon: Icon }, index) => {
+      {TOOLS.map(({ tool, label, commandId, icon: Icon }, index) => {
         const active = effectiveTool === tool;
+        const chord = resolved.byCommand.get(commandId)?.[0];
         return (
-          <Tooltip key={tool} label={label} shortcut={shortcut}>
+          <Tooltip
+            key={tool}
+            label={label}
+            {...(chord !== undefined ? { shortcut: formatChord(chord, platform) } : {})}
+          >
             <button
               type="button"
               aria-pressed={active}
-              aria-keyshortcuts={shortcut}
               tabIndex={active ? 0 : -1}
+              {...(chord !== undefined
+                ? { "aria-keyshortcuts": toAriaKeyshortcuts(chord, platform) }
+                : {})}
               ref={(node) => {
                 buttonRefs.current[index] = node;
               }}

@@ -126,11 +126,9 @@ describe("LayersPanel", () => {
     );
   });
 
-  it("renders nothing in the tree body when the panel is collapsed", () => {
-    useUIStore.setState({ layersOpen: false });
-    renderWithEngine(mockEngine({ nodes: [makeNode({ id: "f1", kind: "frame", parent: null })] }));
-    expect(screen.queryByRole("tree")).not.toBeInTheDocument();
-  });
+  // "collapsed panel renders no tree" moved to LeftPanel.test.tsx in M4 —
+  // panel chrome (width, collapse, tabs) is LeftPanel's responsibility now;
+  // this component is the tree itself and always renders it.
 });
 
 // ─── Keyboard operation (M2 closeout) ─────────────────────────────────────────

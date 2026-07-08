@@ -228,7 +228,7 @@ export class DocumentModel {
    * changes. All mutation must go through the explicit setter methods
    * above.
    *
-   * Uses `structuredClone` rather than a hand-written `{ ...node, x: ... }`
+   * Uses `structuredClone` rather than a handwritten `{ ...node, x: ... }`
    * shallow copy: `DocNode` has nested objects (`fill`, `stroke.color`) that
    * a shallow copy would leave shared with the internal node, silently
    * reopening the same mutability hole one level down. `structuredClone`

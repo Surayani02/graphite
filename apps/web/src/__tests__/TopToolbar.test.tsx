@@ -5,6 +5,11 @@ import { TopToolbar } from "../components/TopToolbar";
 import { EngineContext } from "../contexts/EngineContext";
 import type { UseEngineResult } from "../hooks/useEngine";
 
+import { ensureBuiltinCommands } from "../features/commands/builtin";
+
+// Live chords (M4): titles/aria-keyshortcuts resolve from the registry.
+ensureBuiltinCommands();
+
 function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
   return {
     initEngine: () => () => {},

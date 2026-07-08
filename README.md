@@ -23,8 +23,8 @@ rustup target add wasm32-unknown-unknown
 ## Quick start
 
 ```sh
-pnpm install       # install all Node.js dependencies
-pnpm dev           # start Vite dev server → http://localhost:5173
+pnpm install        # install all Node.js dependencies
+pnpm dev            # start Vite dev server → http://localhost:5173
                     # (builds the @graphite/engine WASM module first,
                     # automatically, via Turborepo's task graph)
 ```

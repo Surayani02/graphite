@@ -5,7 +5,7 @@ const SHAPE_STRIDE = 64; // bytes: 16 × f32 — see graph.rs get_render_list do
 /**
  * Writes the 8-float camera uniform: [scale.x, scale.y, offset.x, offset.y,
  * pixel_size, 0, 0, 0]. `pixel_size = 1/zoom` drives the shader's
- * anti-aliasing band width so edges stay exactly ~1 screen pixel wide at
+ * antialiasing bandwidth so edges stay exactly ~1 screen pixel wide at
  * every zoom level.
  */
 export function updateCameraUniform(state: EngineState): void {

@@ -1,13 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import type { DocNodeKind } from "@graphite/protocol";
 import { ContextMenu, useContextMenuState, type MenuItem } from "@graphite/ui-core";
-import { useUIStore } from "../../stores/uiStore";
 import { useEngineContext } from "../../contexts/EngineContext";
 import { buildTree, type TreeNode } from "../../document/tree";
+import { useCommandShortcut } from "../shortcuts/useResolvedShortcuts";
 
 /**
- * LayersPanel — Phase 6 Milestone 2, context menu added Milestone 3.
+ * LayersPanel — Phase 6 Milestone 2, context menu added Milestone 3,
+ * re-hosted inside LeftPanel's Layers tab in Milestone 4 (panel chrome —
+ * width, collapse, tab strip — lives in layouts/LeftPanel.tsx now; this
+ * component is the tree itself and fills whatever region hosts it).
  *
  * Renders the document's node tree from EngineContext's `nodes` list
  * (pushed by the worker on every load/edit — see workers/engine/scene/mutate.ts)
@@ -21,13 +24,13 @@ import { buildTree, type TreeNode } from "../../document/tree";
  * active row via aria-activedescendant (the WAI-ARIA alternative to roving
  * tabindex — one focusable element, no ref bookkeeping per row).
  * ArrowUp/Down move across selectable rows in visual order, Home/End jump,
- * Enter/Space select.
+ * Enter/Space select. Selection made *outside* the tree (canvas click,
+ * palette layer search) scrolls its row into view — M4's reveal-on-select.
  */
 export function LayersPanel() {
-  const layersOpen = useUIStore((s) => s.layersOpen);
-  const toggleLayers = useUIStore((s) => s.toggleLayers);
   const { nodes, selectedIds, setSelection, deleteSelection } = useEngineContext();
   const menu = useContextMenuState();
+  const deleteShortcut = useCommandShortcut("edit.deleteSelection");
 
   const tree = useMemo(() => buildTree(nodes), [nodes]);
   const selectableIds = useMemo(() => flattenSelectable(tree), [tree]);
@@ -37,11 +40,19 @@ export function LayersPanel() {
   // The stored active row may have been deleted or belong to a previous
   // document — fall back to the current selection, then to nothing.
   const effectiveActiveId =
-    activeId !== null && selectableIds.includes(activeId)
-      ? activeId
-      : selectedId !== undefined && selectableIds.includes(selectedId)
-        ? selectedId
-        : null;
+      activeId !== null && selectableIds.includes(activeId)
+          ? activeId
+          : selectedId !== undefined && selectableIds.includes(selectedId)
+              ? selectedId
+              : null;
+
+  // Reveal-on-select: selection can change without the tree being touched
+  // (canvas click, palette layer search) — bring the row into view so the
+  // tree always reflects where the user just landed.
+  useEffect(() => {
+    if (selectedId === undefined) return;
+    document.getElementById(rowDomId(selectedId))?.scrollIntoView({ block: "nearest" });
+  }, [selectedId]);
 
   const onTreeKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (selectableIds.length === 0) return;
@@ -93,71 +104,50 @@ export function LayersPanel() {
       id: "delete",
       label: "Delete",
       icon: Trash2,
-      shortcut: "Del",
       danger: true,
       onSelect: deleteSelection,
+      // Live chord, not a hardcoded "Del" — remaps (M4 recorder) show here.
+      ...(deleteShortcut !== null ? { shortcut: deleteShortcut.label } : {}),
     },
   ];
 
   return (
-    <aside
-      aria-label="Layers"
-      className={`relative flex flex-col border-r border-border-subtle bg-surface-panel transition-[width] ${
-        layersOpen ? "w-60" : "w-9"
-      }`}
-    >
-      <div className="flex h-9 items-center justify-between border-b border-border-subtle px-2">
-        {layersOpen && (
-          <span className="font-mono text-[11px] uppercase tracking-wide text-content-tertiary">
-            Layers
-          </span>
-        )}
-        <button
-          type="button"
-          title={layersOpen ? "Collapse layers panel" : "Expand layers panel"}
-          onClick={toggleLayers}
-          className="ml-auto rounded px-1.5 py-0.5 text-content-tertiary hover:bg-surface-panel-hover"
-        >
-          {layersOpen ? "‹" : "›"}
-        </button>
-      </div>
-      {layersOpen && (
+      <div className="flex h-full flex-col">
         <div
-          role="tree"
-          aria-label="Layer tree"
-          tabIndex={0}
-          aria-activedescendant={
-            effectiveActiveId !== null ? rowDomId(effectiveActiveId) : undefined
-          }
-          onKeyDown={onTreeKeyDown}
-          className="flex-1 overflow-y-auto py-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/60"
+            role="tree"
+            aria-label="Layer tree"
+            tabIndex={0}
+            aria-activedescendant={
+              effectiveActiveId !== null ? rowDomId(effectiveActiveId) : undefined
+            }
+            onKeyDown={onTreeKeyDown}
+            className="flex-1 overflow-y-auto py-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/60"
         >
           {tree.length === 0 ? (
-            <div className="px-2 py-1 font-mono text-[11px] text-content-tertiary">
-              No layers yet.
-            </div>
+              <div className="px-2 py-1 font-mono text-[11px] text-content-tertiary">
+                No layers yet.
+              </div>
           ) : (
-            tree.map((root) => (
-              <LayerRow
-                key={root.node.id}
-                treeNode={root}
-                depth={0}
-                selectedId={selectedId}
-                activeId={effectiveActiveId}
-                onSelect={select}
-                onContextMenu={onRowContextMenu}
-              />
-            ))
+              tree.map((root) => (
+                  <LayerRow
+                      key={root.node.id}
+                      treeNode={root}
+                      depth={0}
+                      selectedId={selectedId}
+                      activeId={effectiveActiveId}
+                      onSelect={select}
+                      onContextMenu={onRowContextMenu}
+                  />
+              ))
           )}
         </div>
-      )}
-      <ContextMenu
-        open={menu.open}
-        position={menu.position}
-        items={menuItems}
-        onClose={menu.close}
-      />
-    </aside>
+        <ContextMenu
+            open={menu.open}
+            position={menu.position}
+            items={menuItems}
+            onClose={menu.close}
+        />
+      </div>
   );
 }
 
@@ -173,56 +163,56 @@ interface LayerRowProps {
 }
 
 function LayerRow({
-  treeNode,
-  depth,
-  selectedId,
-  activeId,
-  onSelect,
-  onContextMenu,
-}: LayerRowProps) {
+                    treeNode,
+                    depth,
+                    selectedId,
+                    activeId,
+                    onSelect,
+                    onContextMenu,
+                  }: LayerRowProps) {
   const { node, children } = treeNode;
   const isFrame = node.kind === "frame";
   const isSelected = node.id === selectedId;
   const isActive = node.id === activeId;
 
   return (
-    <>
-      <div
-        id={rowDomId(node.id)}
-        role="treeitem"
-        aria-selected={isSelected}
-        onClick={() => {
-          if (!isFrame) onSelect(node.id);
-        }}
-        onContextMenu={(e) => {
-          if (isFrame) return;
-          e.preventDefault();
-          onContextMenu(node.id, e.clientX, e.clientY);
-        }}
-        style={{ paddingLeft: `${8 + depth * 14}px` }}
-        className={`flex h-6 items-center gap-1.5 pr-2 font-mono text-[11px] ${
-          isFrame
-            ? "cursor-default font-semibold text-content-secondary"
-            : "cursor-pointer text-content-tertiary hover:bg-surface-panel-hover"
-        } ${isSelected ? "bg-accent/20 text-content-primary" : ""} ${
-          isActive ? "ring-1 ring-inset ring-accent/70" : ""
-        }`}
-      >
-        <span className="w-3 shrink-0 text-center opacity-60">{kindIcon(node.kind)}</span>
-        <span className="truncate">{node.name}</span>
-      </div>
-      {children.map((child) => (
-        <LayerRow
-          key={child.node.id}
-          treeNode={child}
-          depth={depth + 1}
-          selectedId={selectedId}
-          activeId={activeId}
-          onSelect={onSelect}
-          onContextMenu={onContextMenu}
-        />
-      ))}
-    </>
+      <>
+        <div
+            id={rowDomId(node.id)}
+            role="treeitem"
+            aria-selected={isSelected}
+            onClick={() => {
+              if (!isFrame) onSelect(node.id);
+            }}
+            onContextMenu={(e) => {
+              if (isFrame) return;
+              e.preventDefault();
+              onContextMenu(node.id, e.clientX, e.clientY);
+            }}
+            style={{ paddingLeft: `${8 + depth * 14}px` }}
+            className={`flex h-6 items-center gap-1.5 pr-2 font-mono text-[11px] ${
+                isFrame
+                    ? "cursor-default font-semibold text-content-secondary"
+                    : "cursor-pointer text-content-tertiary hover:bg-surface-panel-hover"
+            } ${isSelected ? "bg-accent/20 text-content-primary" : ""} ${
+                isActive ? "ring-1 ring-inset ring-accent/70" : ""
+            }`}
+        >
+          <span className="w-3 shrink-0 text-center opacity-60">{kindIcon(node.kind)}</span>
+          <span className="truncate">{node.name}</span>
+        </div>
+        {children.map((child) => (
+            <LayerRow
+                key={child.node.id}
+                treeNode={child}
+                depth={depth + 1}
+                selectedId={selectedId}
+                activeId={activeId}
+                onSelect={onSelect}
+                onContextMenu={onContextMenu}
+            />
+        ))}
+      </>
   );
 }
 

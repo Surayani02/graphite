@@ -2,14 +2,20 @@
  * UI-only state — Phase 6.
  *
  * Holds exactly what the blueprint specifies for Zustand: tool selection
- * intent and layout preferences. It never holds engine/renderer/document
- * state (selection, viewport, FPS) — that stays in `useEngine`/Context,
- * reachable via `useEngineContext()`.
+ * intent, layout preferences, and (M4) chrome intent — palette and
+ * shortcut-recorder visibility, the left-panel tab, and persisted shortcut
+ * overrides. It never holds engine/renderer/document state (selection,
+ * viewport, FPS) — that stays in `useEngine`/Context, reachable via
+ * `useEngineContext()`.
  */
 
 import { create } from "zustand";
 import { persist, createJSONStorage, type StateStorage } from "zustand/middleware";
-import type { ToolType } from "@graphite/protocol";
+import { type ToolType } from "@graphite/protocol";
+import { type CommandId } from "../features/commands/types";
+
+/** Which tab the left panel shows. */
+export type LeftPanelTab = "layers" | "assets";
 
 interface UIState {
   /** The tool the user explicitly selected (toolbar click or V/H shortcut). */
@@ -19,11 +25,43 @@ interface UIState {
   spaceDown: boolean;
   layersOpen: boolean;
   inspectorOpen: boolean;
+  /** Active left-panel tab (persisted; M4). */
+  leftPanelTab: LeftPanelTab;
+  /** Command palette visibility (transient; M4). */
+  paletteOpen: boolean;
+  /** Shortcut-recorder dialog visibility (transient; M4). */
+  shortcutRecorderOpen: boolean;
+  /** Command preselected in the recorder when opened for a specific one. */
+  shortcutRecorderTarget: CommandId | null;
+  /**
+   * Persisted keymap edits, keyed by CommandId: a chord string rebinds the
+   * command, `null` explicitly unbinds it, absence means "use defaults".
+   * Values are canonicalized by features/shortcuts at resolve time, so
+   * stale or hand-edited storage degrades to "unbound", never to a crash.
+   */
+  shortcutOverrides: Readonly<Record<string, string | null>>;
 
   setActiveTool: (tool: ToolType) => void;
   setSpaceDown: (down: boolean) => void;
   toggleLayers: () => void;
   toggleInspector: () => void;
+  /** Switches the tab and reveals the panel — navigating to a tab implies
+   * wanting to see it, so a collapsed left panel expands. */
+  setLeftPanelTab: (tab: LeftPanelTab) => void;
+  openPalette: () => void;
+  closePalette: () => void;
+  /** Opens the recorder, closing the palette — one modal at a time. */
+  openShortcutRecorder: (target?: CommandId) => void;
+  closeShortcutRecorder: () => void;
+  /**
+   * Rebinds (chord) or unbinds (`null`) one command. Enforces the
+   * one-chord-one-command invariant among *overrides* by nulling any other
+   * override holding the same chord. Collisions with shipped defaults are
+   * resolved at read time instead (shortcutMap.ts) — clearing this
+   * override later lets a shadowed default come back.
+   */
+  setShortcutOverride: (id: CommandId, chord: string | null) => void;
+  resetShortcuts: () => void;
 }
 
 const noopStorage: StateStorage = {
@@ -43,6 +81,11 @@ export const useUIStore = create<UIState>()(
       spaceDown: false,
       layersOpen: true,
       inspectorOpen: true,
+      leftPanelTab: "layers",
+      paletteOpen: false,
+      shortcutRecorderOpen: false,
+      shortcutRecorderTarget: null,
+      shortcutOverrides: {},
 
       setActiveTool: (tool) => {
         set({ activeTool: tool });
@@ -56,17 +99,58 @@ export const useUIStore = create<UIState>()(
       toggleInspector: () => {
         set((s) => ({ inspectorOpen: !s.inspectorOpen }));
       },
+      setLeftPanelTab: (tab) => {
+        set({ leftPanelTab: tab, layersOpen: true });
+      },
+      openPalette: () => {
+        // Start of the <50ms open budget — CommandPalette closes the measure
+        // after its first painted frame (docs/benchmarks/phase6-m4.md).
+        if (typeof performance !== "undefined") {
+          performance.mark("graphite:palette-open:start");
+        }
+        set({ paletteOpen: true });
+      },
+      closePalette: () => {
+        set({ paletteOpen: false });
+      },
+      openShortcutRecorder: (target) => {
+        set({
+          shortcutRecorderOpen: true,
+          shortcutRecorderTarget: target ?? null,
+          paletteOpen: false,
+        });
+      },
+      closeShortcutRecorder: () => {
+        set({ shortcutRecorderOpen: false, shortcutRecorderTarget: null });
+      },
+      setShortcutOverride: (id, chord) => {
+        set((s) => {
+          const next: Record<string, string | null> = { ...s.shortcutOverrides };
+          if (chord !== null) {
+            for (const [otherId, existing] of Object.entries(next)) {
+              if (otherId !== id && existing === chord) next[otherId] = null;
+            }
+          }
+          next[id] = chord;
+          return { shortcutOverrides: next };
+        });
+      },
+      resetShortcuts: () => {
+        set({ shortcutOverrides: {} });
+      },
     }),
     {
       // Versioned key, separate from the document's "graphite-document-v1" —
       // UI preferences and document content are different persistence concerns.
       name: "graphite-ui-v1",
       storage: createJSONStorage(() => storage),
-      // Only layout preferences persist. activeTool/spaceDown are transient
-      // interaction state and should reset to "select" on every fresh load.
+      // Only durable preferences persist. Tool, space-pan, and modal
+      // visibility are transient interaction state and reset on every load.
       partialize: (state) => ({
         layersOpen: state.layersOpen,
         inspectorOpen: state.inspectorOpen,
+        leftPanelTab: state.leftPanelTab,
+        shortcutOverrides: state.shortcutOverrides,
       }),
     }
   )

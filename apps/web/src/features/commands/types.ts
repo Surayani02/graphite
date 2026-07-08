@@ -1,0 +1,64 @@
+import { type NodePatch, type ToolType } from "@graphite/protocol";
+
+/**
+ * Stable, namespaced command identifier — `"<area>.<action>"`, e.g.
+ * `"tool.rectangle"` or `"file.save"`. Ids are public API the moment they
+ * ship: persisted shortcut overrides key on them, and the Phase 10 plugin
+ * system will address them — rename one and every user keymap breaks.
+ */
+export type CommandId = `${string}.${string}`;
+
+/** Palette grouping + future Settings-page grouping. */
+export type CommandCategory = "Tools" | "Edit" | "File" | "View" | "Help";
+
+/**
+ * The capability surface a command may touch, assembled at dispatch time by
+ * `useCommandContext()`. Deliberately narrow: commands express *user
+ * intent*, so they get the same two legal state surfaces panels do —
+ * engine actions (EngineContext senders, ADR-013 §6) and UI-intent setters
+ * (Zustand) — never raw worker/bridge access.
+ */
+export interface CommandContext {
+  readonly engine: {
+    /** Snapshot of the canvas selection at dispatch time. */
+    readonly selectedIds: readonly string[];
+    readonly setSelection: (nodeIds: readonly string[]) => void;
+    readonly deleteSelection: () => void;
+    readonly requestSave: () => void;
+    readonly updateNode: (nodeId: string, patch: NodePatch) => void;
+  };
+  readonly ui: {
+    readonly setActiveTool: (tool: ToolType) => void;
+    readonly toggleLeftPanel: () => void;
+    readonly toggleInspector: () => void;
+    readonly openPalette: () => void;
+    readonly setLeftPanelTab: (tab: "layers" | "assets") => void;
+    readonly openShortcutRecorder: (target?: CommandId) => void;
+  };
+}
+
+/**
+ * One executable command — the single source of truth both the palette and
+ * the shortcut system derive from (ADR-015).
+ */
+export interface CommandDescriptor {
+  readonly id: CommandId;
+  /** Imperative, palette-facing title — "Delete Selection", not "Deletes…". */
+  readonly title: string;
+  readonly category: CommandCategory;
+  /** Extra search terms; keyword matches rank below title matches. */
+  readonly keywords?: readonly string[];
+  /**
+   * Raw default chords ("mod+s", "delete"), normalized at resolve time by
+   * `features/shortcuts`. Several defaults may alias one command (Delete +
+   * Backspace); the first entry is the display chord. A user override
+   * replaces the whole list.
+   */
+  readonly defaultChords?: readonly string[];
+  /**
+   * When present and false at dispatch time, the command neither runs nor
+   * appears in the palette. Omit for always-available commands.
+   */
+  readonly enabled?: (ctx: CommandContext) => boolean;
+  readonly run: (ctx: CommandContext) => void;
+}

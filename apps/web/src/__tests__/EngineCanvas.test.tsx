@@ -43,44 +43,9 @@ beforeEach(() => {
   useUIStore.setState({ activeTool: "select", spaceDown: false });
 });
 
-describe("EngineCanvas — M3 keyboard shortcuts", () => {
-  it("R sets the active tool to rectangle", () => {
-    renderWithEngine(mockEngine());
-    fireEvent.keyDown(window, { key: "r" });
-    expect(useUIStore.getState().activeTool).toBe("rectangle");
-  });
-
-  it("O sets the active tool to ellipse", () => {
-    renderWithEngine(mockEngine());
-    fireEvent.keyDown(window, { key: "o" });
-    expect(useUIStore.getState().activeTool).toBe("ellipse");
-  });
-
-  it("forwards Delete to the engine via sendKeyDown", () => {
-    const sendKeyDown = vi.fn();
-    renderWithEngine(mockEngine({ sendKeyDown }));
-    fireEvent.keyDown(window, { key: "Delete" });
-    expect(sendKeyDown).toHaveBeenCalledWith("Delete", expect.objectContaining({ shift: false }));
-  });
-
-  it("forwards Backspace to the engine via sendKeyDown", () => {
-    const sendKeyDown = vi.fn();
-    renderWithEngine(mockEngine({ sendKeyDown }));
-    fireEvent.keyDown(window, { key: "Backspace" });
-    expect(sendKeyDown).toHaveBeenCalledWith("Backspace", expect.anything());
-  });
-
-  it("does not forward Delete when a form field has focus (isEditableTarget guard)", () => {
-    const sendKeyDown = vi.fn();
-    renderWithEngine(mockEngine({ sendKeyDown }));
-    const input = document.createElement("input");
-    document.body.appendChild(input);
-    input.focus();
-    fireEvent.keyDown(input, { key: "Delete" });
-    expect(sendKeyDown).not.toHaveBeenCalled();
-    document.body.removeChild(input);
-  });
-});
+// The M3 global-keyboard specs (tool letters, Delete/Backspace handling,
+// the editable-target guard, Space-pan) moved with the listener itself to
+// ShortcutProvider.test.tsx in M4 — EngineCanvas no longer owns keys.
 
 describe("EngineCanvas — context menu", () => {
   it("does not open the menu when nothing is selected", () => {
