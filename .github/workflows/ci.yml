@@ -100,6 +100,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The WASM engine (packages/engine/pkg) is a gitignored build artifact,
+      # so it must be built before the web app that imports it. The webServer
+      # command in playwright.config.ts only runs the web Vite build, which
+      # would otherwise fail on the missing @graphite/engine import.
+      - name: Build engine (WASM)
+        run: pnpm --filter @graphite/engine run build
+
       - name: Install Playwright browsers
         run: pnpm --filter @graphite/web exec playwright install --with-deps chromium
 
