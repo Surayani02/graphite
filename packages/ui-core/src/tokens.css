@@ -23,6 +23,9 @@
      suppressed, per the accessibility standard. Distinct from -subtle so a
      focus ring is never mistaken for an ordinary panel divider. */
   --color-border-focus: #1677ff;
+  /* M5: a stronger divider than -subtle, for hover/emphasis borders
+     (e.g. Assets swatch hover). Added when its first consumer shipped. */
+  --color-border-strong: rgb(255 255 255 / 18%);
   --color-content-primary: rgb(255 255 255 / 92%);
   --color-content-secondary: rgb(255 255 255 / 60%);
   --color-content-tertiary: rgb(255 255 255 / 38%);
@@ -31,5 +34,56 @@
   --color-danger: #ff6b6b;
 
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
 
+/**
+ * Light theme (M5, ADR-017). Same semantic token names, re-valued.
+ * Applied by features/theme when the resolved theme is "light"; dark is the
+ * bare-default block above and carries no attribute. Only colour tokens are
+ * re-valued — fonts, radii, and everything non-colour are theme-invariant.
+ *
+ * Tailwind v4 emits `@theme` tokens as `:root` custom properties, so this
+ * ordinary attribute-scoped block overrides them at equal specificity by
+ * source order — no `!important`, no layer juggling.
+ */
+[data-theme="light"] {
+  --color-surface-canvas: #f5f6f8;
+  --color-surface-panel: #ffffff;
+  --color-surface-panel-hover: #eef0f4;
+  --color-border-subtle: rgb(0 0 0 / 10%);
+  --color-border-strong: rgb(0 0 0 / 22%);
+  --color-border-focus: #1677ff;
+  --color-content-primary: rgb(0 0 0 / 88%);
+  --color-content-secondary: rgb(0 0 0 / 60%);
+  --color-content-tertiary: rgb(0 0 0 / 42%);
+  --color-accent: #1677ff;
+  --color-accent-hover: #0958d9;
+  --color-danger: #d4380d;
+}
+
+/**
+ * Forced colours — Windows High Contrast (M5, ADR-017). A system *state*,
+ * not a user preference, so it overrides both value blocks regardless of
+ * the data-theme attribute. Semantic tokens map to the system colour
+ * keywords so the OS palette drives the UI; the browser forces most colours
+ * anyway, but mapping the tokens keeps surfaces/text/borders coherent
+ * (correct pairing of Canvas/CanvasText, actionable elements on Highlight)
+ * rather than left to per-property guesswork.
+ */
+@media (forced-colors: active) {
+  :root,
+  [data-theme="light"] {
+    --color-surface-canvas: Canvas;
+    --color-surface-panel: Canvas;
+    --color-surface-panel-hover: Canvas;
+    --color-border-subtle: CanvasText;
+    --color-border-strong: CanvasText;
+    --color-border-focus: Highlight;
+    --color-content-primary: CanvasText;
+    --color-content-secondary: CanvasText;
+    --color-content-tertiary: GrayText;
+    --color-accent: Highlight;
+    --color-accent-hover: Highlight;
+    --color-danger: CanvasText;
+  }
 }

@@ -33,3 +33,6 @@ coverage/
 .DS_Store
 Thumbs.db
 desktop.ini
+# Playwright
+apps/web/playwright-report/
+apps/web/test-results/

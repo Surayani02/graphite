@@ -2,34 +2,32 @@ import { EngineProvider } from "../contexts/EngineContext";
 import { TopToolbar } from "../components/TopToolbar";
 import { StatusBar } from "../components/StatusBar";
 import { ToolsRail } from "../features/tools/ToolsRail";
-import { InspectorPanel } from "../features/inspector/InspectorPanel";
 import { EngineCanvas } from "../components/EngineCanvas";
 import { ensureBuiltinCommands } from "../features/commands/builtin";
 import { CommandPalette } from "../features/palette/CommandPalette";
 import { ShortcutProvider } from "../features/shortcuts/ShortcutProvider";
 import { ShortcutRecorderDialog } from "../features/shortcuts/ShortcutRecorderDialog";
-import { LeftPanel } from "./LeftPanel";
+import { ensureBuiltinPanels } from "../features/panels/builtinPanels";
+import { PanelAreaSlot } from "../features/panels/PanelArea";
 
-// Composition root is where the command registry fills: module scope, so
-// every builtin exists before first paint — the palette's <50ms open budget
-// never pays for registration, and ShortcutProvider resolves a complete map
-// on its first render. Idempotent, so HMR re-imports are safe.
+// Composition root fills both registries at module scope, so every builtin
+// command and panel exists before first paint — the palette's <50ms open
+// budget never pays for registration, and ShortcutProvider resolves a
+// complete map on first render. Both are idempotent (HMR-safe).
 ensureBuiltinCommands();
+ensureBuiltinPanels();
 
 /**
- * Root editor shell — Phase 6 Milestone 1; tools rail added Milestone 3;
- * command layer, palette, recorder, and the tabbed left panel added
- * Milestone 4.
+ * Root editor shell — Phase 6 M1; tools rail M3; command layer, palette,
+ * recorder, tabbed left panel M4; panels rendered from the PanelDescriptor
+ * registry M5 (ADR-018).
  *
- * Grid layout: header (toolbar) / body (tools | left panel | viewport |
- * inspector) / footer (status bar). EngineProvider wraps the whole shell
- * so every panel reads live engine state via useEngineContext() without
- * prop drilling, while UI-only state (tool, panel visibility) lives in
- * Zustand. ShortcutProvider sits directly inside EngineProvider — it
- * needs engine context to build the dispatch context, and everything
- * below it (including the modals) shares one global key owner. The
- * palette and recorder mount here permanently and render nothing while
- * closed.
+ * Grid: header (toolbar) / body (tools | left area | viewport | right area)
+ * / footer (status bar). The left and right columns are now
+ * <PanelAreaSlot>s — the shell places areas, the registry decides which
+ * panels fill them. EngineProvider + ShortcutProvider wrap the shell (this
+ * is the editor route "/"); the palette and recorder mount here and render
+ * nothing while closed.
  */
 export function AppShell() {
   return (
@@ -39,9 +37,9 @@ export function AppShell() {
           <TopToolbar />
           <div className="grid grid-cols-[auto_auto_1fr_auto] overflow-hidden">
             <ToolsRail />
-            <LeftPanel />
+            <PanelAreaSlot area="left" />
             <EngineCanvas />
-            <InspectorPanel />
+            <PanelAreaSlot area="right" />
           </div>
           <StatusBar />
         </div>

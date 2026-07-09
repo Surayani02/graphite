@@ -13,11 +13,12 @@ import { create } from "zustand";
 import { persist, createJSONStorage, type StateStorage } from "zustand/middleware";
 import { type ToolType } from "@graphite/protocol";
 import { type CommandId } from "../features/commands/types";
+import { type ThemePreference } from "../features/theme/theme";
 
 /** Which tab the left panel shows. */
 export type LeftPanelTab = "layers" | "assets";
 
-interface UIState {
+export interface UIState {
   /** The tool the user explicitly selected (toolbar click or V/H shortcut). */
   activeTool: ToolType;
   /** True while the spacebar is held — temporarily overrides the engine's
@@ -40,6 +41,9 @@ interface UIState {
    * stale or hand-edited storage degrades to "unbound", never to a crash.
    */
   shortcutOverrides: Readonly<Record<string, string | null>>;
+  /** Appearance preference (persisted; M5). Resolved to a concrete theme
+   * and applied to the document by features/theme. */
+  themePreference: ThemePreference;
 
   setActiveTool: (tool: ToolType) => void;
   setSpaceDown: (down: boolean) => void;
@@ -62,6 +66,7 @@ interface UIState {
    */
   setShortcutOverride: (id: CommandId, chord: string | null) => void;
   resetShortcuts: () => void;
+  setThemePreference: (preference: ThemePreference) => void;
 }
 
 const noopStorage: StateStorage = {
@@ -86,6 +91,7 @@ export const useUIStore = create<UIState>()(
       shortcutRecorderOpen: false,
       shortcutRecorderTarget: null,
       shortcutOverrides: {},
+      themePreference: "dark",
 
       setActiveTool: (tool) => {
         set({ activeTool: tool });
@@ -138,6 +144,9 @@ export const useUIStore = create<UIState>()(
       resetShortcuts: () => {
         set({ shortcutOverrides: {} });
       },
+      setThemePreference: (preference) => {
+        set({ themePreference: preference });
+      },
     }),
     {
       // Versioned key, separate from the document's "graphite-document-v1" —
@@ -151,6 +160,7 @@ export const useUIStore = create<UIState>()(
         inspectorOpen: state.inspectorOpen,
         leftPanelTab: state.leftPanelTab,
         shortcutOverrides: state.shortcutOverrides,
+        themePreference: state.themePreference,
       }),
     }
   )

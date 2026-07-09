@@ -24,3 +24,5 @@ export { EmptyState } from "./components/EmptyState";
 export { Kbd } from "./components/Kbd";
 export { SearchableListBox } from "./components/SearchableListBox";
 export type { SearchableListSection } from "./components/SearchableListBox";
+export { RadioGroup } from "./components/RadioGroup";
+export type { RadioOption } from "./components/RadioGroup";

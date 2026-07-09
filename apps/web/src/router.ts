@@ -1,0 +1,37 @@
+import { createRoute, createRouter, redirect } from "@tanstack/react-router";
+import { rootRoute } from "./routes/__root";
+import { editorRoute } from "./routes/index";
+import { settingsRoute } from "./routes/settings";
+
+/**
+ * Route tree + router (M5, ADR-016). Code-based, not the file-based plugin:
+ * at three routes the generator's convention cost buys nothing, and an
+ * explicit tree is greppable. Fixed future shape (reserved, not built):
+ * `/plugins` (P10), `/account` (P8), `/docs/*`.
+ *
+ * Unknown paths redirect to the editor rather than showing a 404 — this is
+ * a single-window design tool, not a content site. The redirect is a
+ * catch-all splat route whose `beforeLoad` throws `redirect` (the supported
+ * mechanism — a thrown redirect during loading is caught by the router and
+ * turned into navigation, whereas throwing it from a not-found *component*
+ * surfaces as an uncaught Response).
+ */
+const catchAllRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "$",
+  beforeLoad: () => {
+    throw redirect({ to: "/" });
+  },
+});
+
+const routeTree = rootRoute.addChildren([editorRoute, settingsRoute, catchAllRoute]);
+
+export const router = createRouter({
+  routeTree,
+});
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}
