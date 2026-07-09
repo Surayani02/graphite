@@ -15,31 +15,60 @@ owns UI chrome only.
 ## Runtime architecture
 
 ```
-Main thread   React 19 shell: AppShell grid → TopToolbar / Layers / Viewport /
-Inspector / StatusBar  (M3: tools rail, menus · M4: tabbed
-left panel, command palette, shortcut recorder)
-Zustand uiStore — UI intent only, persisted "graphite-ui-v1"
-EngineContext (stable, memoised) + EngineFrameContext (60Hz
-stats/viewport; StatusBar only) — ADR-013 §6
-useSyncToolWithEngine — the only UI→engine crossing
-Command registry + ShortcutProvider (M4, ADR-015): palette and
-shortcuts are two views of one command list
-EngineWorkerBridge — typed senders + FpsTracker
-│  @graphite/protocol — versioned, JSON-serialisable IPC contract
-Worker        engine.worker.ts orchestrator over one shared EngineState:
-gpu/{shader,pipeline,context,buffers,render} · input/{pointer,
-keyboard} · scene/{demo,rebuild,mutate} · camera · selection
-DocumentModel (TypeScript, worker-owned SOURCE OF TRUTH,
-UUID keys, _version, validate.ts) — ADR-011
-Hybrid MessageChannel+setTimeout render loop (~60 fps)
-localStorage: graphite-document-v1 (auto-save + Ctrl+S)
-│  wasm-bindgen — ADR-004/005
-Rust/WASM     @graphite/engine SceneGraph: arena slot-map (ADR-008), ids
-never reused, hit_test → Option<u32>, incremental setters,
-get_render_list → flat 16-f32/shape, frustum-culled
-│  Float32Array → storage buffer (destroy + double on overflow)
-WebGPU        One instanced SDF draw (rect/round-rect/ellipse, 1-px AA via
-pixel_size, centre strokes, Porter-Duff) + selection overlay
+Graphite runtime
+├─ MAIN THREAD — React 19 shell (UI chrome only; never in frame timing)
+│  ├─ AppShell
+│  │  ├─ Grid
+│  │  │  ├─ TopToolbar — document actions (Save, live mod+S chord)
+│  │  │  ├─ ToolsRail (M3) — Select / Pan / Rectangle / Ellipse, live chords
+│  │  │  ├─ LeftPanel (M4) — tabs: Layers tree | Assets (document colors)
+│  │  │  ├─ Viewport — EngineCanvas: pointer/wheel capture, context menu;
+│  │  │  │             OffscreenCanvas transferred to the worker (ADR-003)
+│  │  │  ├─ InspectorPanel
+│  │  │  └─ StatusBar
+│  │  └─ Modals (M4) — CommandPalette · ShortcutRecorderDialog
+│  ├─ Zustand uiStore — UI intent ONLY, persisted "graphite-ui-v1"
+│  ├─ EngineContext — stable, memoised (ADR-013 §6)
+│  │  └─ EngineFrameContext — 60 Hz stats/viewport, StatusBar only
+│  ├─ useSyncToolWithEngine — the only UI → engine tool crossing
+│  ├─ Command layer (M4, ADR-015)
+│  │  ├─ Command registry — single source of truth for actions
+│  │  ├─ ShortcutProvider — sole owner of global keys
+│  │  └─ Palette + shortcuts — two views of the one command list
+│  ├─ Document persistence I/O — localStorage "graphite-document-v1"
+│  │  ├─ Boot: read → document:load / document:new
+│  │  └─ Save: worker-serialised state written on auto-save (tab hide)
+│  │           and mod+S (file.save) — workers have no localStorage
+│  └─ EngineWorkerBridge — typed senders + FpsTracker
+│
+├─ ⇅ BOUNDARY — @graphite/protocol: versioned, JSON-serialisable IPC;
+│                the ONLY main ↔ worker crossing
+│
+├─ WORKER — owns render loop, GPU state, input hot path, the document
+│  ├─ engine.worker.ts — orchestrator over one shared EngineState
+│  ├─ gpu/ — shader · pipeline · context · buffers · render
+│  ├─ input/ — pointer · keyboard (Escape drag-cancel, raw-key protocol)
+│  ├─ scene/ — demo · rebuild · mutate
+│  ├─ camera · selection
+│  ├─ DocumentModel — TypeScript, worker-owned SOURCE OF TRUTH (ADR-011)
+│  │  └─ UUID keys · _version · validate.ts
+│  └─ Hybrid MessageChannel + setTimeout render loop (~60 fps)
+│
+├─ ⇅ BOUNDARY — wasm-bindgen (ADR-004 / ADR-005)
+│
+├─ RUST / WASM — @graphite/engine SceneGraph
+│  ├─ Arena slot-map; ids never reused (ADR-008)
+│  ├─ hit_test → Option<u32>
+│  ├─ Incremental setters
+│  └─ get_render_list — flat 16 f32 per shape, frustum-culled
+│
+├─ ⇅ BOUNDARY — Float32Array → GPU storage buffer
+│                (overflow: destroy, recreate at 2× capacity)
+│
+└─ WEBGPU
+   ├─ ONE instanced SDF draw — rect / round-rect / ellipse
+   │  └─ 1-px AA via pixel_size · centre strokes · Porter-Duff
+   └─ Selection overlay — rendered alongside, outside the instanced draw
 ```
 
 **Layer ownership (non-negotiable):** React owns panels, dialogs, menus,
