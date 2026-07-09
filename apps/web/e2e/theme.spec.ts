@@ -4,7 +4,7 @@ import { waitForShell } from "./helpers";
 test.describe("theming", () => {
   test("editor renders under the light theme", async ({ page }) => {
     await page.goto("/settings");
-    await page.getByRole("radio", { name: /Light/ }).click();
+    await page.getByText("Light", { exact: true }).click();
     await page.getByRole("link", { name: "Back to editor" }).click();
     await waitForShell(page);
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");

@@ -29,7 +29,7 @@ test.describe("accessibility — no serious/critical violations", () => {
 
   test("editor, light", async ({ page }) => {
     await page.goto("/settings");
-    await page.getByRole("radio", { name: /Light/ }).click();
+    await page.getByText("Light", { exact: true }).click();
     await page.getByRole("link", { name: "Back to editor" }).click();
     await waitForShell(page);
     await scan(page);

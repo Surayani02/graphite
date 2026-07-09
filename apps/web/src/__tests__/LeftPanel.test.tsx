@@ -59,7 +59,11 @@ describe("LeftPanel", () => {
     renderLeftPanel();
     expect(screen.getByRole("tablist", { name: "Left panel" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Layers" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tree", { name: "Layer tree" })).toBeInTheDocument();
+    // With no nodes, the Layers tab shows the empty-state region (not a
+    // role="tree" — an empty tree fails aria-required-children, so the tree
+    // role and keyboard model appear only once there are rows).
+    expect(screen.getByRole("region", { name: "Layer tree" })).toBeInTheDocument();
+    expect(screen.getByText("No layers yet.")).toBeInTheDocument();
   });
 
   it("switching to Assets persists the tab and shows assets content", async () => {

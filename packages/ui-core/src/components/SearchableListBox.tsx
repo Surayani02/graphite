@@ -77,39 +77,49 @@ export function SearchableListBox<T>({
           className="w-full bg-transparent font-mono text-[12px] text-content-primary outline-none placeholder:text-content-tertiary"
         />
       </SearchField>
-      <ListBox
-        aria-label={`${label} results`}
-        selectionMode="none"
-        onAction={(key) => {
-          onAction(String(key));
-        }}
-        renderEmptyState={() => emptyState}
-        className="max-h-80 overflow-y-auto p-1"
-      >
-        {visibleSections.map((section) => (
-          <ListBoxSection key={section.id} id={section.id}>
-            <Header className="px-2 pb-1 pt-1.5 font-mono text-[10px] uppercase tracking-wide text-content-tertiary">
-              {section.title}
-            </Header>
-            {section.items.map((item) => (
-              <ListBoxItem
-                key={itemKey(item)}
-                id={itemKey(item)}
-                textValue={itemText(item)}
-                className={({ isFocused }) =>
-                  `flex h-7 cursor-pointer items-center gap-2 rounded px-2 font-mono text-[12px] ${
-                    isFocused
-                      ? "bg-surface-panel-hover text-content-primary"
-                      : "text-content-secondary"
-                  }`
-                }
-              >
-                {renderItem(item)}
-              </ListBoxItem>
-            ))}
-          </ListBoxSection>
-        ))}
-      </ListBox>
+      {/*
+        The scroll lives on this wrapper, not the ListBox: RAC's ListBox
+        doesn't accept a tabIndex prop, and axe's scrollable-region-focusable
+        (a Safari keyboard-access rule) requires whatever element actually
+        scrolls to be keyboard-focusable. A focusable wrapper lets a
+        keyboard-only user scroll the results even while virtual focus sits on
+        the search field (Autocomplete's model). The listbox semantics stay on
+        the ListBox itself.
+      */}
+      <div tabIndex={0} className="max-h-80 overflow-y-auto p-1">
+        <ListBox
+          aria-label={`${label} results`}
+          selectionMode="none"
+          onAction={(key) => {
+            onAction(String(key));
+          }}
+          renderEmptyState={() => emptyState}
+        >
+          {visibleSections.map((section) => (
+            <ListBoxSection key={section.id} id={section.id}>
+              <Header className="px-2 pb-1 pt-1.5 font-mono text-[10px] uppercase tracking-wide text-content-tertiary">
+                {section.title}
+              </Header>
+              {section.items.map((item) => (
+                <ListBoxItem
+                  key={itemKey(item)}
+                  id={itemKey(item)}
+                  textValue={itemText(item)}
+                  className={({ isFocused }) =>
+                    `flex h-7 cursor-pointer items-center gap-2 rounded px-2 font-mono text-[12px] ${
+                      isFocused
+                        ? "bg-surface-panel-hover text-content-primary"
+                        : "text-content-secondary"
+                    }`
+                  }
+                >
+                  {renderItem(item)}
+                </ListBoxItem>
+              ))}
+            </ListBoxSection>
+          ))}
+        </ListBox>
+      </div>
     </Autocomplete>
   );
 }

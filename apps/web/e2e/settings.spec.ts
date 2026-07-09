@@ -16,7 +16,7 @@ test.describe("settings route", () => {
 
   test("theme preference applies live and persists across reload", async ({ page }) => {
     await page.goto("/settings");
-    await page.getByRole("radio", { name: /Light/ }).click();
+    await page.getByText("Light", { exact: true }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
     await page.reload();

@@ -60,7 +60,7 @@ export function RadioGroup({ label, value, onChange, options }: RadioGroupProps)
  *  Split out only to keep the option's className logic readable. */
 function RadioDot(): ReactNode {
   return (
-    <span className="mt-0.5 flex h-3 w-3 shrink-0 items-center justify-center rounded-full border border-content-tertiary">
+    <span className="pointer-events-none mt-0.5 flex h-3 w-3 shrink-0 items-center justify-center rounded-full border border-content-tertiary">
       <span className="h-1.5 w-1.5 rounded-full bg-accent opacity-0 in-data-[selected]:opacity-100" />
     </span>
   );

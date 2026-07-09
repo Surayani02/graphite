@@ -28,7 +28,7 @@
   --color-border-strong: rgb(255 255 255 / 18%);
   --color-content-primary: rgb(255 255 255 / 92%);
   --color-content-secondary: rgb(255 255 255 / 60%);
-  --color-content-tertiary: rgb(255 255 255 / 38%);
+  --color-content-tertiary: rgb(255 255 255 / 52%);
   --color-accent: #1677ff;
   --color-accent-hover: #3b8aff;
   --color-danger: #ff6b6b;
@@ -55,7 +55,7 @@
   --color-border-focus: #1677ff;
   --color-content-primary: rgb(0 0 0 / 88%);
   --color-content-secondary: rgb(0 0 0 / 60%);
-  --color-content-tertiary: rgb(0 0 0 / 42%);
+  --color-content-tertiary: rgb(0 0 0 / 55%);
   --color-accent: #1677ff;
   --color-accent-hover: #0958d9;
   --color-danger: #d4380d;
