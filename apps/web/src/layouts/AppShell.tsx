@@ -1,4 +1,5 @@
 import { EngineProvider } from "../contexts/EngineContext";
+import { FilesProvider } from "../features/files/FilesProvider";
 import { TopToolbar } from "../components/TopToolbar";
 import { StatusBar } from "../components/StatusBar";
 import { ToolsRail } from "../features/tools/ToolsRail";
@@ -32,20 +33,22 @@ ensureBuiltinPanels();
 export function AppShell() {
   return (
     <EngineProvider>
-      <ShortcutProvider>
-        <div className="grid h-screen grid-rows-[auto_1fr_auto] bg-surface-canvas text-content-primary">
-          <TopToolbar />
-          <div className="grid grid-cols-[auto_auto_1fr_auto] overflow-hidden">
-            <ToolsRail />
-            <PanelAreaSlot area="left" />
-            <EngineCanvas />
-            <PanelAreaSlot area="right" />
+      <FilesProvider>
+        <ShortcutProvider>
+          <div className="grid h-screen grid-rows-[auto_1fr_auto] bg-surface-canvas text-content-primary">
+            <TopToolbar />
+            <div className="grid grid-cols-[auto_auto_1fr_auto] overflow-hidden">
+              <ToolsRail />
+              <PanelAreaSlot area="left" />
+              <EngineCanvas />
+              <PanelAreaSlot area="right" />
+            </div>
+            <StatusBar />
           </div>
-          <StatusBar />
-        </div>
-        <CommandPalette />
-        <ShortcutRecorderDialog />
-      </ShortcutProvider>
+          <CommandPalette />
+          <ShortcutRecorderDialog />
+        </ShortcutProvider>
+      </FilesProvider>
     </EngineProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { EngineWorkerBridge } from "../engine/bridge";
 import type { EngineStats } from "../engine/bridge";
 import type {
@@ -41,8 +41,12 @@ export interface UseEngineResult {
   sendPointerUp: (x: number, y: number, button: number, mods: PointerModifiers) => void;
   sendWheel: (dx: number, dy: number, x: number, y: number, mods: PointerModifiers) => void;
   sendKeyDown: (key: string, mods: KeyboardModifiers) => void;
-  // Document (Phase 5)
-  requestSave: () => void;
+  // Document (Phase 5, renamed Phase 7 M2)
+  /** Asks the worker for a fresh state broadcast so the localStorage
+   *  recovery snapshot updates — without touching the dirty flag (file
+   *  saves are getDocumentJson + markSaved). The visibility handler in
+   *  EngineCanvas fires this when the tab hides. */
+  requestRecoverySnapshot: () => void;
   // Layers / Inspector (Phase 6 Milestone 2)
   nodes: readonly DocNode[];
   setSelection: (nodeIds: readonly string[]) => void;
@@ -54,6 +58,20 @@ export interface UseEngineResult {
    *  until the first such change occurs this session. */
   lastEngineTool: ToolType | null;
   deleteSelection: () => void;
+  // Files (Phase 7 Milestone 2)
+  /** Loads a bare DocumentData JSON string into the worker (replaces the
+   *  current document, clears history). The file layer unwraps `.graphite`
+   *  envelopes before calling this — the worker never sees them. */
+  loadDocument: (json: string) => void;
+  /** Starts a fresh document (worker seeds the default scene, clears history). */
+  newDocument: () => void;
+  /** Requests a fresh serialisation from the worker and resolves with the
+   *  bare DocumentData JSON. Rejects if the engine worker isn't running.
+   *  Correlated by requestId, so a document:new/load broadcast racing the
+   *  request can never be mistaken for the answer. */
+  getDocumentJson: () => Promise<string>;
+  /** Confirms a durable write — clears the worker's dirty flag. */
+  markSaved: () => void;
   // History (Phase 7 Milestone 1)
   /** Undo/redo availability — drives command enablement and (later, M2)
    *  the unsaved-changes indicator. Mirrors the worker's history:state. */
@@ -94,6 +112,13 @@ export function useEngine(): UseEngineResult {
   const [lastEngineTool, setLastEngineTool] = useState<ToolType | null>(null);
   const [historyStatus, setHistoryStatus] = useState<HistoryStatus>(DEFAULT_HISTORY_STATUS);
   const [historyAnnouncement, setHistoryAnnouncement] = useState<string | null>(null);
+
+  /** Pending getDocumentJson() calls, keyed by requestId (Phase 7 M2). */
+  const pendingStateRequests = useRef(new Map<string, (json: string) => void>());
+  useEffect(() => {
+    const pending = pendingStateRequests.current;
+    return () => pending.clear();
+  }, []);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -137,7 +162,16 @@ export function useEngine(): UseEngineResult {
       .on("onViewportChanged", (x, y, z) => {
         setViewport({ x, y, zoom: z });
       })
-      .on("onDocumentState", (json) => {
+      .on("onDocumentState", (json, requestId) => {
+        // A correlated answer resolves its waiting file save (Phase 7 M2)…
+        if (requestId !== null) {
+          const resolve = pendingStateRequests.current.get(requestId);
+          if (resolve !== undefined) {
+            pendingStateRequests.current.delete(requestId);
+            resolve(json);
+          }
+        }
+        // …and every state broadcast still feeds the recovery snapshot:
         // Worker has serialised the document; persist it locally.
         // setItem throws (QuotaExceededError) once the document outgrows
         // the ~5MB localStorage budget — without the guard that exception
@@ -206,9 +240,6 @@ export function useEngine(): UseEngineResult {
   const sendKeyDown = useCallback((key: string, mods: KeyboardModifiers) => {
     bridgeRef.current?.sendKeyDown(key, mods);
   }, []);
-  const requestSave = useCallback(() => {
-    bridgeRef.current?.requestSave();
-  }, []);
   const setSelection = useCallback((nodeIds: readonly string[]) => {
     bridgeRef.current?.setSelection(nodeIds);
   }, []);
@@ -223,6 +254,29 @@ export function useEngine(): UseEngineResult {
   }, []);
   const redo = useCallback(() => {
     bridgeRef.current?.redo();
+  }, []);
+  const requestRecoverySnapshot = useCallback(() => {
+    bridgeRef.current?.requestSave();
+  }, []);
+  const loadDocument = useCallback((json: string) => {
+    bridgeRef.current?.loadDocument(json);
+  }, []);
+  const newDocument = useCallback(() => {
+    bridgeRef.current?.newDocument();
+  }, []);
+  const getDocumentJson = useCallback((): Promise<string> => {
+    const bridge = bridgeRef.current;
+    if (bridge === null) {
+      return Promise.reject(new Error("Engine worker is not running"));
+    }
+    return new Promise<string>((resolve) => {
+      const requestId = crypto.randomUUID();
+      pendingStateRequests.current.set(requestId, resolve);
+      bridge.requestSave(requestId);
+    });
+  }, []);
+  const markSaved = useCallback(() => {
+    bridgeRef.current?.markSaved();
   }, []);
 
   return {
@@ -239,7 +293,7 @@ export function useEngine(): UseEngineResult {
     sendPointerUp,
     sendWheel,
     sendKeyDown,
-    requestSave,
+    requestRecoverySnapshot,
     nodes,
     setSelection,
     updateNode,
@@ -249,5 +303,9 @@ export function useEngine(): UseEngineResult {
     historyAnnouncement,
     undo,
     redo,
+    loadDocument,
+    newDocument,
+    getDocumentJson,
+    markSaved,
   };
 }

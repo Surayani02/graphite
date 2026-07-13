@@ -27,7 +27,7 @@ rather than introducing a parallel patch type.
 `node:create` carries the full `DocNode` snapshot plus **two indices**:
 `childIndex` (position in the parent's `children` array) and `orderIndex`
 (position in the document's insertion order, which is paint/rebuild order).
-Undoing a delete must restore z-order exactly; a snapshot without the order
+Undoing a deletion must restore z-order exactly; a snapshot without the order
 index would re-append and silently reshuffle paint order.
 
 ### 2. `applyOp` is the single application authority

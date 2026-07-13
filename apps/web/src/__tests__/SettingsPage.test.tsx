@@ -64,7 +64,7 @@ describe("SettingsPage — appearance", () => {
 describe("SettingsPage — keymap editor", () => {
   it("lists commands with their live chords", async () => {
     renderSettings();
-    expect(await screen.findByRole("option", { name: /Save Document/ })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: /Save Document(?! As)/ })).toBeInTheDocument();
   });
 
   it("reflects a persisted override in the displayed chord", async () => {
@@ -85,7 +85,7 @@ describe("SettingsPage — keymap editor", () => {
     renderSettings();
     await userEvent.type(await screen.findByRole("searchbox"), "ellipse");
     expect(screen.getByRole("option", { name: /Ellipse Tool/ })).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /Save Document/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Save Document(?! As)/ })).not.toBeInTheDocument();
   });
 
   it("Reset all clears every override", async () => {

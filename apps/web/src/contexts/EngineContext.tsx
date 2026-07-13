@@ -56,7 +56,6 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       stable.sendPointerUp,
       stable.sendWheel,
       stable.sendKeyDown,
-      stable.requestSave,
       stable.setSelection,
       stable.updateNode,
       stable.lastEngineTool,
@@ -65,6 +64,11 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       stable.historyAnnouncement,
       stable.undo,
       stable.redo,
+      stable.requestRecoverySnapshot,
+      stable.loadDocument,
+      stable.newDocument,
+      stable.getDocumentJson,
+      stable.markSaved,
     ]
   );
 

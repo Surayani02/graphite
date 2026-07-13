@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EngineContext } from "../contexts/EngineContext";
+import { FilesContext, type FilesContextValue } from "../features/files/FilesProvider";
 import { ensureBuiltinCommands } from "../features/commands/builtin";
 import { createCommandRegistry } from "../features/commands/registry";
 import { CommandPalette } from "../features/palette/CommandPalette";
@@ -54,7 +55,11 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     sendPointerUp: vi.fn(),
     sendWheel: vi.fn(),
     sendKeyDown: vi.fn(),
-    requestSave: vi.fn(),
+    requestRecoverySnapshot: vi.fn(),
+    loadDocument: vi.fn(),
+    newDocument: vi.fn(),
+    getDocumentJson: vi.fn(() => Promise.resolve("{}")),
+    markSaved: vi.fn(),
     nodes: NODES,
     setSelection: vi.fn(),
     updateNode: vi.fn(),
@@ -74,10 +79,28 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
   };
 }
 
-function renderPalette(engine: UseEngineResult = mockEngine()) {
+function mockFiles(overrides: Partial<FilesContextValue> = {}): FilesContextValue {
+  return {
+    fileName: null,
+    dirty: false,
+    fileError: null,
+    save: vi.fn(),
+    saveAs: vi.fn(),
+    open: vi.fn(),
+    newDocument: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderPalette(
+  engine: UseEngineResult = mockEngine(),
+  files: FilesContextValue = mockFiles()
+) {
   return render(
     <EngineContext.Provider value={engine}>
-      <CommandPalette registry={registry} />
+      <FilesContext.Provider value={files}>
+        <CommandPalette registry={registry} />
+      </FilesContext.Provider>
     </EngineContext.Provider>
   );
 }
@@ -112,7 +135,7 @@ describe("CommandPalette", () => {
     renderPalette();
     openPalette();
     expect(screen.getByRole("dialog", { name: "Command palette" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /Save Document/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Save Document(?! As)/ })).toBeInTheDocument();
     // Delete Selection is disabled with an empty selection → filtered out.
     expect(screen.queryByRole("option", { name: /Delete Selection/ })).not.toBeInTheDocument();
     // Node results only appear once a query exists.
@@ -120,13 +143,14 @@ describe("CommandPalette", () => {
   });
 
   it("filters as the user types and Enter executes the top match, closing the palette", async () => {
-    const requestSave = vi.fn();
-    renderPalette(mockEngine({ requestSave }));
+    const files = mockFiles();
+    renderPalette(mockEngine(), files);
     openPalette();
     await userEvent.type(screen.getByRole("searchbox"), "save doc");
     expect(screen.queryByRole("option", { name: /Rectangle Tool/ })).not.toBeInTheDocument();
     await userEvent.keyboard("{Enter}");
-    expect(requestSave).toHaveBeenCalledTimes(1);
+    // Phase 7 M2: Save Document routes through the files layer.
+    expect(files.save).toHaveBeenCalledTimes(1);
     expect(useUIStore.getState().paletteOpen).toBe(false);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

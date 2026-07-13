@@ -26,9 +26,9 @@ test.describe("settings route", () => {
 
   test("keymap editor lists commands and search filters them", async ({ page }) => {
     await page.goto("/settings");
-    await expect(page.getByRole("option", { name: /Save Document/ })).toBeVisible();
+    await expect(page.getByRole("option", { name: /Save Document(?! As)/ })).toBeVisible();
     await page.getByRole("searchbox", { name: "Keyboard shortcuts" }).fill("ellipse");
     await expect(page.getByRole("option", { name: /Ellipse Tool/ })).toBeVisible();
-    await expect(page.getByRole("option", { name: /Save Document/ })).toBeHidden();
+    await expect(page.getByRole("option", { name: /Save Document(?! As)/ })).toBeHidden();
   });
 });

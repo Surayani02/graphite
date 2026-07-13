@@ -1,19 +1,21 @@
 import { useEngineContext } from "../contexts/EngineContext";
+import { useFiles } from "../features/files/FilesProvider";
 import { useCommandShortcut } from "../features/shortcuts/useResolvedShortcuts";
 
 /**
- * Top toolbar — Phase 6 M1, slimmed to document-level actions in M3.
+ * Top toolbar — Phase 6 M1, slimmed to document-level actions in M3,
+ * file-session aware in Phase 7 M2.
  *
- * The Select/Pan tool buttons that lived here in M1 have moved to
- * `features/tools/ToolsRail`, alongside the new Rectangle/Ellipse
- * creation tools — one place owns "which tool is active" UI, rather than
- * splitting it across two toolbars. What's left here is document-scoped,
- * not tool-scoped: the wordmark and Save, with more document actions
- * (export, undo/redo) joining at their own milestones. Save's chord is
- * live from the resolved shortcut map (M4) — remaps show here too.
+ * Document-scoped chrome only: the wordmark, the current file name with
+ * the unsaved-changes dot (title-bar convention — the dot, not the name,
+ * is the dirty signal), a transient file-error slot, and Save. Save now
+ * routes through the FilesProvider (real `.graphite` writes, confirmed-
+ * write dirty semantics) rather than poking the worker directly; its
+ * chord label stays live from the resolved shortcut map (M4).
  */
 export function TopToolbar() {
-  const { requestSave, status } = useEngineContext();
+  const { status } = useEngineContext();
+  const { fileName, dirty, fileError, save } = useFiles();
   const saveShortcut = useCommandShortcut("file.save");
 
   return (
@@ -22,6 +24,21 @@ export function TopToolbar() {
         Graphite
       </span>
 
+      <span className="max-w-64 truncate font-mono text-xs text-content-tertiary">
+        {fileName ?? "Untitled"}
+        {dirty && (
+          <span className="ml-1 text-content-secondary" title="Unsaved changes">
+            ●<span className="sr-only"> (unsaved changes)</span>
+          </span>
+        )}
+      </span>
+
+      {fileError !== null && (
+        <span role="alert" className="max-w-96 truncate font-mono text-[11px] text-danger">
+          {fileError}
+        </span>
+      )}
+
       <div className="flex-1" />
 
       <button
@@ -29,7 +46,7 @@ export function TopToolbar() {
         title={saveShortcut === null ? "Save" : `Save (${saveShortcut.label})`}
         {...(saveShortcut !== null ? { "aria-keyshortcuts": saveShortcut.aria } : {})}
         disabled={status !== "running"}
-        onClick={requestSave}
+        onClick={save}
         className="rounded px-2.5 py-1 font-mono text-xs text-content-secondary hover:bg-surface-panel-hover disabled:opacity-40"
       >
         Save

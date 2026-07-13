@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useEngineContext } from "../../contexts/EngineContext";
+import { useFiles } from "../files/FilesProvider";
 import { useUIStore } from "../../stores/uiStore";
 import { type CommandContext } from "./types";
 
@@ -12,15 +13,16 @@ import { type CommandContext } from "./types";
  */
 export function useCommandContext(): CommandContext {
   const {
+    status,
     selectedIds,
     setSelection,
     deleteSelection,
-    requestSave,
     updateNode,
     historyStatus,
     undo,
     redo,
   } = useEngineContext();
+  const { save, saveAs, open, newDocument } = useFiles();
   const setActiveTool = useUIStore((s) => s.setActiveTool);
   const toggleLayers = useUIStore((s) => s.toggleLayers);
   const toggleInspector = useUIStore((s) => s.toggleInspector);
@@ -31,15 +33,16 @@ export function useCommandContext(): CommandContext {
   return useMemo<CommandContext>(
     () => ({
       engine: {
+        status,
         selectedIds,
         setSelection,
         deleteSelection,
-        requestSave,
         updateNode,
         historyStatus,
         undo,
         redo,
       },
+      files: { save, saveAs, open, newDocument },
       ui: {
         setActiveTool,
         toggleLeftPanel: toggleLayers,
@@ -50,14 +53,18 @@ export function useCommandContext(): CommandContext {
       },
     }),
     [
+      status,
       selectedIds,
       setSelection,
       deleteSelection,
-      requestSave,
       updateNode,
       historyStatus,
       undo,
       redo,
+      save,
+      saveAs,
+      open,
+      newDocument,
       setActiveTool,
       toggleLayers,
       toggleInspector,

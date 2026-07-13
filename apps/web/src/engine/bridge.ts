@@ -14,6 +14,10 @@
  * Additions over M3 (Phase 7 M1):
  *   - onHistoryStatus event
  *   - undo(), redo() methods
+ * Additions over M1 (Phase 7 M2):
+ *   - requestSave() takes an optional correlation id, echoed by
+ *     onDocumentState
+ *   - markSaved() method (confirmed durable write)
  */
 
 import type {
@@ -44,8 +48,8 @@ export interface EngineBridgeEvents {
   onError: (message: string) => void;
   onSelectionChanged: (nodeIds: readonly string[]) => void;
   onViewportChanged: (x: number, y: number, zoom: number) => void;
-  // Phase 5
-  onDocumentState: (json: string) => void;
+  // Phase 5; requestId added Phase 7 M2 (null for spontaneous broadcasts)
+  onDocumentState: (json: string, requestId: string | null) => void;
   // Phase 6 Milestone 2
   onDocumentNodes: (nodes: readonly DocNode[]) => void;
   // Phase 6 Milestone 3
@@ -140,10 +144,20 @@ export class EngineWorkerBridge {
     this.worker.postMessage(msg);
   }
 
-  /** Request the worker to serialise and return the current document. */
-  requestSave(): void {
-    const msg: MainToEngineMessage = { type: "document:request_save" };
+  /** Request the worker to serialise and return the current document.
+   *  `requestId` is echoed on the answering onDocumentState. */
+  requestSave(requestId?: string): void {
+    const msg: MainToEngineMessage =
+      requestId !== undefined
+        ? { type: "document:request_save", requestId }
+        : { type: "document:request_save" };
     this.worker.postMessage(msg);
+  }
+
+  /** Confirms a durable write of the last serialised state (Phase 7 M2) —
+   *  clears the worker-side dirty flag. Call only after the write succeeded. */
+  markSaved(): void {
+    this.worker.postMessage({ type: "document:mark_saved" } satisfies MainToEngineMessage);
   }
 
   // ── Interaction (Phase 4) ─────────────────────────────────────────────────
@@ -270,7 +284,7 @@ export class EngineWorkerBridge {
         break;
       }
       case "document:state": {
-        this.handlers.onDocumentState?.(msg.json);
+        this.handlers.onDocumentState?.(msg.json, msg.requestId ?? null);
         break;
       }
       case "document:nodes": {

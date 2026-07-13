@@ -1,4 +1,5 @@
 import { type HistoryStatus, type NodePatch, type ToolType } from "@graphite/protocol";
+import { type EngineStatus } from "../../hooks/useEngine";
 
 /**
  * Stable, namespaced command identifier — `"<area>.<action>"`, e.g.
@@ -24,13 +25,24 @@ export interface CommandContext {
     readonly selectedIds: readonly string[];
     readonly setSelection: (nodeIds: readonly string[]) => void;
     readonly deleteSelection: () => void;
-    readonly requestSave: () => void;
+    /** Engine lifecycle — file commands gate on "running": there is no
+     *  document to serialise (or load into) before the worker is up
+     *  (Phase 7 M2). */
+    readonly status: EngineStatus;
     readonly updateNode: (nodeId: string, patch: NodePatch) => void;
     /** Undo/redo availability at dispatch time — drives `enabled` gates
      *  the same way `selectedIds` gates deletion (Phase 7 M1). */
     readonly historyStatus: HistoryStatus;
     readonly undo: () => void;
     readonly redo: () => void;
+  };
+  /** File actions (Phase 7 M2) — fire-and-forget; FilesProvider owns the
+   *  async flow, pickers, discard guard, and error surfacing. */
+  readonly files: {
+    readonly save: () => void;
+    readonly saveAs: () => void;
+    readonly open: () => void;
+    readonly newDocument: () => void;
   };
   readonly ui: {
     readonly setActiveTool: (tool: ToolType) => void;

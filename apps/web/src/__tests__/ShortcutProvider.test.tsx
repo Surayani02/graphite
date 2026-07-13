@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, act } from "@testing-library/react";
 import { EngineContext } from "../contexts/EngineContext";
+import { FilesContext, type FilesContextValue } from "../features/files/FilesProvider";
 import { ensureBuiltinCommands } from "../features/commands/builtin";
 import { createCommandRegistry } from "../features/commands/registry";
 import { ShortcutProvider } from "../features/shortcuts/ShortcutProvider";
@@ -28,7 +29,11 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     sendPointerUp: vi.fn(),
     sendWheel: vi.fn(),
     sendKeyDown: vi.fn(),
-    requestSave: vi.fn(),
+    requestRecoverySnapshot: vi.fn(),
+    loadDocument: vi.fn(),
+    newDocument: vi.fn(),
+    getDocumentJson: vi.fn(() => Promise.resolve("{}")),
+    markSaved: vi.fn(),
     nodes: [],
     setSelection: vi.fn(),
     updateNode: vi.fn(),
@@ -48,12 +53,30 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
   };
 }
 
-function renderProvider(engine: UseEngineResult = mockEngine()) {
+function mockFiles(overrides: Partial<FilesContextValue> = {}): FilesContextValue {
+  return {
+    fileName: null,
+    dirty: false,
+    fileError: null,
+    save: vi.fn(),
+    saveAs: vi.fn(),
+    open: vi.fn(),
+    newDocument: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderProvider(
+  engine: UseEngineResult = mockEngine(),
+  files: FilesContextValue = mockFiles()
+) {
   return render(
     <EngineContext.Provider value={engine}>
-      <ShortcutProvider registry={registry}>
-        <div />
-      </ShortcutProvider>
+      <FilesContext.Provider value={files}>
+        <ShortcutProvider registry={registry}>
+          <div />
+        </ShortcutProvider>
+      </FilesContext.Provider>
     </EngineContext.Provider>
   );
 }
@@ -93,11 +116,11 @@ describe("ShortcutProvider — tool chords (ported from EngineCanvas M3)", () =>
 });
 
 describe("ShortcutProvider — command dispatch", () => {
-  it("mod+S runs Save and prevents the browser default", () => {
-    const requestSave = vi.fn();
-    renderProvider(mockEngine({ requestSave }));
+  it("mod+S runs Save through the files layer and prevents the browser default", () => {
+    const files = mockFiles();
+    renderProvider(mockEngine(), files);
     const notPrevented = fireEvent.keyDown(window, { key: "s", ctrlKey: true });
-    expect(requestSave).toHaveBeenCalledTimes(1);
+    expect(files.save).toHaveBeenCalledTimes(1);
     expect(notPrevented).toBe(false);
   });
 

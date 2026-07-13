@@ -268,8 +268,14 @@ export type EngineToMainMessage =
   // ── Phase 5 ─────────────────────────────────────────────────────────────────
   | {
       readonly type: "document:state";
-      /** Complete document serialised as JSON — write to localStorage. */
+      /** Complete document serialised as JSON. Always written to the
+       *  localStorage recovery snapshot by the main thread; when
+       *  `requestId` is present it additionally answers the matching
+       *  `document:request_save` (Phase 7 M2 — file saves await a fresh
+       *  serialisation, correlated by id so a spontaneous state broadcast
+       *  from document:new/load can never be mistaken for it). */
       readonly json: string;
+      readonly requestId?: string | undefined;
     }
   // ── Phase 6 Milestone 2 ─────────────────────────────────────────────────────
   | {
@@ -353,8 +359,12 @@ export type MainToEngineMessage =
       readonly type: "document:new";
     }
   | {
-      /** Request the worker to serialise the current document and send it back. */
+      /** Request the worker to serialise the current document and send it
+       *  back. `requestId`, when present, is echoed on the answering
+       *  `document:state` (Phase 7 M2). Serialisation only — since M2 this
+       *  no longer marks the history saved; see document:mark_saved. */
       readonly type: "document:request_save";
+      readonly requestId?: string | undefined;
     }
   // ── Phase 6 Milestone 2 ─────────────────────────────────────────────────────
   | {
@@ -381,7 +391,17 @@ export type MainToEngineMessage =
     }
   // ── Phase 7 Milestone 1 ─────────────────────────────────────────────────────
   | { readonly type: "history:undo" }
-  | { readonly type: "history:redo" };
+  | { readonly type: "history:redo" }
+  // ── Phase 7 Milestone 2 ─────────────────────────────────────────────────────
+  | {
+      /** The main thread confirmed a durable write (file, or fallback
+       *  download) of the most recent document:state — the history's
+       *  current position becomes the saved state and `dirty` clears.
+       *  Sent only on confirmed success: a cancelled picker or a failed
+       *  write must leave the document dirty, which is exactly why M1's
+       *  mark-on-request behaviour moved out of the worker. */
+      readonly type: "document:mark_saved";
+    };
 
 // ─── Performance constants ────────────────────────────────────────────────────
 

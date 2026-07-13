@@ -48,9 +48,16 @@ const state = createInitialState();
 
 /** Serialises the current document and posts it, if one exists. Used by
  * document:new / document:load / document:request_save — all three end
- * with "tell the main thread the canonical document state". */
-function postDocumentState(): void {
-  if (state.docModel) post({ type: "document:state", json: state.docModel.serialize() });
+ * with "tell the main thread the canonical document state". A request_save
+ * passes its `requestId` through so the main thread can correlate the
+ * answer with the file save that asked for it (Phase 7 M2). */
+function postDocumentState(requestId?: string): void {
+  if (!state.docModel) return;
+  if (requestId !== undefined) {
+    post({ type: "document:state", json: state.docModel.serialize(), requestId });
+  } else {
+    post({ type: "document:state", json: state.docModel.serialize() });
+  }
 }
 
 self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void> => {
@@ -130,10 +137,10 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
     }
 
     case "document:request_save": {
-      postDocumentState();
-      // The serialised state just posted is what the main thread persists
-      // — from history's point of view, the document is now saved.
-      markHistorySaved(state);
+      // Serialisation only. Marking saved moved behind document:mark_saved
+      // in M2: the main thread may be about to show a save picker the user
+      // cancels, and a cancelled save must leave the document dirty.
+      postDocumentState(msg.requestId);
       break;
     }
 
@@ -213,6 +220,13 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
 
     case "history:redo": {
       redoEdit(state);
+      break;
+    }
+
+    // ── Phase 7 Milestone 2 ───────────────────────────────────────────────
+
+    case "document:mark_saved": {
+      markHistorySaved(state);
       break;
     }
 

@@ -6,14 +6,15 @@ import { normalizeChord } from "../features/shortcuts/chord";
 
 function fakeContext(
   selectedIds: readonly string[] = [],
-  history: { canUndo?: boolean; canRedo?: boolean } = {}
+  history: { canUndo?: boolean; canRedo?: boolean } = {},
+  status: "running" | "error" = "running"
 ): CommandContext {
   return {
     engine: {
+      status,
       selectedIds,
       setSelection: vi.fn(),
       deleteSelection: vi.fn(),
-      requestSave: vi.fn(),
       updateNode: vi.fn(),
       historyStatus: {
         canUndo: history.canUndo ?? false,
@@ -24,6 +25,12 @@ function fakeContext(
       },
       undo: vi.fn(),
       redo: vi.fn(),
+    },
+    files: {
+      save: vi.fn(),
+      saveAs: vi.fn(),
+      open: vi.fn(),
+      newDocument: vi.fn(),
     },
     ui: {
       setActiveTool: vi.fn(),
@@ -98,7 +105,7 @@ describe("builtinCommands", () => {
 
     const save = fakeContext();
     registry.execute("file.save", save);
-    expect(save.engine.requestSave).toHaveBeenCalledTimes(1);
+    expect(save.files.save).toHaveBeenCalledTimes(1);
 
     const palette = fakeContext();
     registry.execute("view.commandPalette", palette);
@@ -151,5 +158,43 @@ describe("edit.undo / edit.redo", () => {
     const redo = builtinCommands.find((c) => c.id === "edit.redo");
     expect(undo?.defaultChords).toEqual(["mod+z"]);
     expect(redo?.defaultChords).toEqual(["mod+shift+z", "mod+y"]);
+  });
+});
+
+// ─── File commands (Phase 7 Milestone 2) ─────────────────────────────────────
+
+describe("file commands", () => {
+  it("registers all four with the expected chords", () => {
+    const byId = new Map(builtinCommands.map((c) => [c.id, c]));
+    expect(byId.get("file.save")?.defaultChords).toEqual(["mod+s"]);
+    expect(byId.get("file.saveAs")?.defaultChords).toEqual(["mod+shift+s"]);
+    expect(byId.get("file.open")?.defaultChords).toEqual(["mod+o"]);
+    // mod+n is browser-reserved in Chromium — New ships chord-less.
+    expect(byId.get("file.new")).toBeDefined();
+    expect(byId.get("file.new")?.defaultChords).toBeUndefined();
+  });
+
+  it("each dispatches to its FilesProvider action", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    const pairs = [
+      ["file.saveAs", "saveAs"],
+      ["file.open", "open"],
+      ["file.new", "newDocument"],
+    ] as const;
+    for (const [id, action] of pairs) {
+      const ctx = fakeContext();
+      expect(registry.execute(id, ctx)).toBe(true);
+      expect(ctx.files[action]).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("all four gate on the engine running — no document, no file ops", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    for (const id of ["file.save", "file.saveAs", "file.open", "file.new"] as const) {
+      const ctx = fakeContext([], {}, "error");
+      expect(registry.execute(id, ctx)).toBe(false);
+    }
   });
 });

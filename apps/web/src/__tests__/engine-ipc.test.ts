@@ -419,3 +419,33 @@ describe("history messages (Phase 7 M1)", () => {
     }
   });
 });
+
+// ─── Phase 7 Milestone 2 — file save correlation ─────────────────────────────
+
+describe("save correlation messages (Phase 7 M2)", () => {
+  it("document:request_save optionally carries a correlation id", () => {
+    const bare: MainToEngineMessage = { type: "document:request_save" };
+    const correlated: MainToEngineMessage = {
+      type: "document:request_save",
+      requestId: "save-1",
+    };
+    expect(bare.requestId).toBeUndefined();
+    expect(correlated.requestId).toBe("save-1");
+  });
+
+  it("document:state echoes the id so races with spontaneous broadcasts are impossible", () => {
+    const spontaneous: EngineToMainMessage = { type: "document:state", json: "{}" };
+    const answer: EngineToMainMessage = {
+      type: "document:state",
+      json: "{}",
+      requestId: "save-1",
+    };
+    expect(spontaneous.requestId).toBeUndefined();
+    expect(answer.requestId).toBe("save-1");
+  });
+
+  it("document:mark_saved is a bare confirmation intent", () => {
+    const msg: MainToEngineMessage = { type: "document:mark_saved" };
+    expect(Object.keys(msg)).toHaveLength(1);
+  });
+});

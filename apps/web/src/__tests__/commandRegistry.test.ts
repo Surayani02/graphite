@@ -5,10 +5,10 @@ import { type CommandContext, type CommandDescriptor } from "../features/command
 function fakeContext(selectedIds: readonly string[] = []): CommandContext {
   return {
     engine: {
+      status: "running",
       selectedIds,
       setSelection: vi.fn(),
       deleteSelection: vi.fn(),
-      requestSave: vi.fn(),
       updateNode: vi.fn(),
       historyStatus: {
         canUndo: false,
@@ -19,6 +19,12 @@ function fakeContext(selectedIds: readonly string[] = []): CommandContext {
       },
       undo: vi.fn(),
       redo: vi.fn(),
+    },
+    files: {
+      save: vi.fn(),
+      saveAs: vi.fn(),
+      open: vi.fn(),
+      newDocument: vi.fn(),
     },
     ui: {
       setActiveTool: vi.fn(),

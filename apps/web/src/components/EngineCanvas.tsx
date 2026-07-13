@@ -29,7 +29,7 @@ export function EngineCanvas() {
     sendPointerMove,
     sendPointerUp,
     sendWheel,
-    requestSave,
+    requestRecoverySnapshot,
     selectedIds,
     deleteSelection,
   } = useEngineContext();
@@ -51,11 +51,11 @@ export function EngineCanvas() {
 
   useEffect(() => {
     const handler = () => {
-      if (globalThis.document.visibilityState === "hidden") requestSave();
+      if (globalThis.document.visibilityState === "hidden") requestRecoverySnapshot();
     };
     globalThis.document.addEventListener("visibilitychange", handler);
     return () => globalThis.document.removeEventListener("visibilitychange", handler);
-  }, [requestSave]);
+  }, [requestRecoverySnapshot]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
