@@ -10,6 +10,15 @@ function fakeContext(selectedIds: readonly string[] = []): CommandContext {
       deleteSelection: vi.fn(),
       requestSave: vi.fn(),
       updateNode: vi.fn(),
+      historyStatus: {
+        canUndo: false,
+        canRedo: false,
+        undoLabel: null,
+        redoLabel: null,
+        dirty: false,
+      },
+      undo: vi.fn(),
+      redo: vi.fn(),
     },
     ui: {
       setActiveTool: vi.fn(),

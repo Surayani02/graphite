@@ -10,12 +10,18 @@ function formatTime(d: Date): string {
  * not a leak. Everything else in the shell reads the stable context.
  */
 export function StatusBar() {
-  const { status, lastSaved, selectedIds, error } = useEngineContext();
+  const { status, lastSaved, selectedIds, error, historyAnnouncement } = useEngineContext();
   const { stats, viewport } = useEngineFrame();
   const zoomPct = Math.round(viewport.zoom * 100);
 
   return (
     <footer className="flex h-7 items-center gap-4 border-t border-border-subtle bg-surface-panel px-3 font-mono text-[11px] text-content-tertiary">
+      {/* Undo/redo announcements for screen readers (Phase 7 M1): visually
+          nothing changes on undo except canvas pixels, which NVDA can't
+          narrate — this polite live region says "Undid Move Rectangle". */}
+      <span role="status" className="sr-only">
+        {historyAnnouncement ?? ""}
+      </span>
       {status === "initializing" && <span>Initializing…</span>}
 
       {status === "running" && (

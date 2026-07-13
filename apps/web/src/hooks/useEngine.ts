@@ -6,6 +6,7 @@ import type {
   PointerModifiers,
   KeyboardModifiers,
   DocNode,
+  HistoryStatus,
   NodePatch,
 } from "@graphite/protocol";
 import { DEFAULT_CAMERA } from "@graphite/protocol";
@@ -53,9 +54,26 @@ export interface UseEngineResult {
    *  until the first such change occurs this session. */
   lastEngineTool: ToolType | null;
   deleteSelection: () => void;
+  // History (Phase 7 Milestone 1)
+  /** Undo/redo availability — drives command enablement and (later, M2)
+   *  the unsaved-changes indicator. Mirrors the worker's history:state. */
+  historyStatus: HistoryStatus;
+  /** Human-readable record of the last undo/redo ("Undid Move Rectangle"),
+   *  rendered into the StatusBar's live region for screen readers. `null`
+   *  until the first undo/redo this session. */
+  historyAnnouncement: string | null;
+  undo: () => void;
+  redo: () => void;
 }
 
 const DEFAULT_STATS: EngineStats = { frameNumber: 0, renderTimeMs: 0, fps: 0 };
+const DEFAULT_HISTORY_STATUS: HistoryStatus = {
+  canUndo: false,
+  canRedo: false,
+  undoLabel: null,
+  redoLabel: null,
+  dirty: false,
+};
 // BUG-06: was a locally-duplicated { x: 375, y: 315, zoom: 1 } literal that
 // had to be kept in sync by hand with the worker's initial camera state.
 // Both now read from the same protocol-level constant.
@@ -74,6 +92,8 @@ export function useEngine(): UseEngineResult {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [nodes, setNodes] = useState<readonly DocNode[]>([]);
   const [lastEngineTool, setLastEngineTool] = useState<ToolType | null>(null);
+  const [historyStatus, setHistoryStatus] = useState<HistoryStatus>(DEFAULT_HISTORY_STATUS);
+  const [historyAnnouncement, setHistoryAnnouncement] = useState<string | null>(null);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -136,6 +156,14 @@ export function useEngine(): UseEngineResult {
       })
       .on("onToolChanged", (tool) => {
         setLastEngineTool(tool);
+      })
+      .on("onHistoryStatus", (status, announce) => {
+        setHistoryStatus(status);
+        if (announce !== null) {
+          setHistoryAnnouncement(
+            `${announce.action === "undo" ? "Undid" : "Redid"} ${announce.label}`
+          );
+        }
       });
 
     bridge.init(canvas);
@@ -190,6 +218,12 @@ export function useEngine(): UseEngineResult {
   const deleteSelection = useCallback(() => {
     bridgeRef.current?.deleteSelection();
   }, []);
+  const undo = useCallback(() => {
+    bridgeRef.current?.undo();
+  }, []);
+  const redo = useCallback(() => {
+    bridgeRef.current?.redo();
+  }, []);
 
   return {
     initEngine,
@@ -211,5 +245,9 @@ export function useEngine(): UseEngineResult {
     updateNode,
     lastEngineTool,
     deleteSelection,
+    historyStatus,
+    historyAnnouncement,
+    undo,
+    redo,
   };
 }

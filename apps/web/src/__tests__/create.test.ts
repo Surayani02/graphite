@@ -5,8 +5,13 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { EngineState } from "../workers/engine/state";
 import { DocumentModel } from "../document/model";
+import { History } from "../workers/engine/history";
 
-vi.mock("../workers/engine/messaging", () => ({ post: vi.fn() }));
+vi.mock("../workers/engine/messaging", () => ({
+  post: vi.fn(),
+  toErrorMsg: vi.fn((raw: unknown) => ({ type: "engine:error", message: String(raw) })),
+}));
+vi.mock("../workers/engine/scene/rebuild", () => ({ rebuildSceneFromDocument: vi.fn() }));
 
 import {
   beginCreation,
@@ -39,6 +44,7 @@ function makeState() {
     isDragging: false,
     selectedId: null,
     selectedUuid: null,
+    history: new History(),
   } as unknown as EngineState;
 
   return { state, scene };
@@ -241,5 +247,55 @@ describe("cancelCreation", () => {
     const { state, scene } = makeState();
     cancelCreation(state);
     expect(scene.remove_node).not.toHaveBeenCalled();
+  });
+});
+
+// ─── History recording (Phase 7 Milestone 1) ─────────────────────────────────
+
+describe("creation history", () => {
+  it("commit records one 'Create Rectangle' entry after the nodes broadcast", () => {
+    const { state } = makeState();
+    beginCreation(state, "rectangle", 0, 0);
+    updateCreation(state, 50, 50, false);
+    commitCreation(state, 50, 50, false);
+
+    expect(state.history.status()).toMatchObject({
+      canUndo: true,
+      undoLabel: "Create Rectangle",
+    });
+    const types = vi.mocked(post).mock.calls.map(([msg]) => msg.type);
+    expect(types.indexOf("history:state")).toBeGreaterThan(types.indexOf("document:nodes"));
+  });
+
+  it("the entry's forward op snapshots the final committed bounds", () => {
+    const { state } = makeState();
+    beginCreation(state, "ellipse", 0, 0);
+    updateCreation(state, 50, 50, false);
+    commitCreation(state, 200, 120, false);
+
+    expect(state.history.status().undoLabel).toBe("Create Ellipse");
+    const nodeId = state.docModel
+      ?.getNodesInOrder()
+      .map((n) => n.id)
+      .find((id) => id !== "f1");
+    expect(nodeId).toBeDefined();
+    if (nodeId === undefined) return;
+    expect(state.docModel?.getNode(nodeId)).toMatchObject({ w: 200, h: 120 });
+  });
+
+  it("captures the selection at gesture start as selectionBefore", () => {
+    const { state } = makeState();
+    state.selectedUuid = "f1";
+    state.selectedId = 0;
+    beginCreation(state, "rectangle", 0, 0);
+    expect(state.creation?.selectionBefore).toEqual(["f1"]);
+  });
+
+  it("cancel records nothing", () => {
+    const { state } = makeState();
+    beginCreation(state, "rectangle", 0, 0);
+    updateCreation(state, 50, 50, false);
+    cancelCreation(state);
+    expect(state.history.status().canUndo).toBe(false);
   });
 });

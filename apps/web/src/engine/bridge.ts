@@ -11,6 +11,9 @@
  *   - onToolChanged event (worker-initiated tool change, e.g. auto-return
  *     to "select" after a shape commits)
  *   - deleteSelection() method
+ * Additions over M3 (Phase 7 M1):
+ *   - onHistoryStatus event
+ *   - undo(), redo() methods
  */
 
 import type {
@@ -20,6 +23,8 @@ import type {
   PointerModifiers,
   KeyboardModifiers,
   DocNode,
+  HistoryAnnounce,
+  HistoryStatus,
   NodeId,
   NodePatch,
 } from "@graphite/protocol";
@@ -45,6 +50,8 @@ export interface EngineBridgeEvents {
   onDocumentNodes: (nodes: readonly DocNode[]) => void;
   // Phase 6 Milestone 3
   onToolChanged: (tool: ToolType) => void;
+  // Phase 7 Milestone 1
+  onHistoryStatus: (status: HistoryStatus, announce: HistoryAnnounce | null) => void;
 }
 
 // ─── Class ────────────────────────────────────────────────────────────────────
@@ -222,6 +229,16 @@ export class EngineWorkerBridge {
     this.worker.postMessage({ type: "document:delete_selection" } satisfies MainToEngineMessage);
   }
 
+  // ── History (Phase 7 Milestone 1) ──────────────────────────────────────────
+
+  undo(): void {
+    this.worker.postMessage({ type: "history:undo" } satisfies MainToEngineMessage);
+  }
+
+  redo(): void {
+    this.worker.postMessage({ type: "history:redo" } satisfies MainToEngineMessage);
+  }
+
   // ── Incoming messages ─────────────────────────────────────────────────────
 
   private handleWorkerMessage(msg: EngineToMainMessage): void {
@@ -262,6 +279,10 @@ export class EngineWorkerBridge {
       }
       case "tool:changed": {
         this.handlers.onToolChanged?.(msg.tool);
+        break;
+      }
+      case "history:state": {
+        this.handlers.onHistoryStatus?.(msg.status, msg.announce ?? null);
         break;
       }
       default:

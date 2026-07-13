@@ -9,7 +9,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { EngineToMainMessage, MainToEngineMessage } from "@graphite/protocol";
+import type {
+  DocumentOp,
+  EngineToMainMessage,
+  HistoryStatus,
+  MainToEngineMessage,
+} from "@graphite/protocol";
 import { FRAME_BUDGET_MS, TARGET_FPS, createNodeId } from "@graphite/protocol";
 
 // ─── Main → Engine ───────────────────────────────────────────────────────────
@@ -333,5 +338,84 @@ describe("Document IPC messages — Phase 6 Milestone 2", () => {
     };
     expect(unset.patch.stroke).toBeUndefined();
     expect(cleared.patch.stroke).toBeNull();
+  });
+});
+
+// ─── Phase 7 Milestone 1 — history ───────────────────────────────────────────
+
+describe("history messages (Phase 7 M1)", () => {
+  it("history:undo / history:redo are bare intents", () => {
+    const undo: MainToEngineMessage = { type: "history:undo" };
+    const redo: MainToEngineMessage = { type: "history:redo" };
+    expect(Object.keys(undo)).toHaveLength(1);
+    expect(Object.keys(redo)).toHaveLength(1);
+  });
+
+  it("history:state carries a full status snapshot", () => {
+    const status: HistoryStatus = {
+      canUndo: true,
+      canRedo: false,
+      undoLabel: "Move Rectangle",
+      redoLabel: null,
+      dirty: true,
+    };
+    const msg: EngineToMainMessage = { type: "history:state", status };
+    expect(msg.status.undoLabel).toBe("Move Rectangle");
+    expect(msg.status.dirty).toBe(true);
+  });
+
+  it("history:state's announce is optional and names the action", () => {
+    const bare: EngineToMainMessage = {
+      type: "history:state",
+      status: {
+        canUndo: false,
+        canRedo: true,
+        undoLabel: null,
+        redoLabel: "Undo me",
+        dirty: false,
+      },
+    };
+    const announced: EngineToMainMessage = {
+      type: "history:state",
+      status: {
+        canUndo: false,
+        canRedo: true,
+        undoLabel: null,
+        redoLabel: "Undo me",
+        dirty: false,
+      },
+      announce: { action: "undo", label: "Undo me" },
+    };
+    expect(bare.announce).toBeUndefined();
+    expect(announced.announce?.action).toBe("undo");
+  });
+
+  it("every DocumentOp shape survives a JSON round-trip (ops are wire material)", () => {
+    const ops: DocumentOp[] = [
+      {
+        op: "node:create",
+        node: {
+          id: "n1",
+          kind: "rect",
+          name: "Rectangle",
+          x: 1,
+          y: 2,
+          w: 3,
+          h: 4,
+          fill: { r: 9, g: 8, b: 7, a: 255 },
+          stroke: null,
+          cornerRadius: 0,
+          parent: "f1",
+          children: [],
+        },
+        childIndex: 0,
+        orderIndex: 1,
+      },
+      { op: "node:remove", nodeId: "n1" },
+      { op: "node:set-props", nodeId: "n1", patch: { x: 10, stroke: null } },
+    ];
+    for (const op of ops) {
+      expect(JSON.parse(JSON.stringify(op))).toEqual(op);
+    }
   });
 });

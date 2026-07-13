@@ -214,6 +214,76 @@ export class DocumentModel {
     return true;
   }
 
+  /**
+   * Phase 7 M1 — sets the stroke to an exact value, including `null`
+   * ("no stroke"). `setStroke` above cannot express `null`, which forced
+   * the Phase 6 inspector to encode "cleared" as a transparent zero-width
+   * stroke object; that lossy encoding breaks undo round-trips (a node
+   * created with `stroke: null` must come back as `null`, not as an
+   * equivalent-looking object). Op application writes through this method;
+   * `setStroke` remains for callers that always have a concrete stroke.
+   */
+  setStrokeValue(id: string, stroke: DocStroke | null): void {
+    const node = this.nodeMap.get(id);
+    if (!node) return;
+    node.stroke = stroke === null ? null : structuredClone(stroke);
+    this._version++;
+  }
+
+  /**
+   * Phase 7 M1 — a node's current position in its parent's `children`
+   * array (`-1` for parentless roots) and in the document's insertion
+   * order. Captured by `applyOp` before a removal so the inverse
+   * `node:create` can splice the node back exactly where it was —
+   * including its paint order — rather than appending it.
+   */
+  getNodeIndices(id: string): { childIndex: number; orderIndex: number } | undefined {
+    const node = this.nodeMap.get(id);
+    if (!node) return undefined;
+
+    let childIndex = -1;
+    if (node.parent !== null) {
+      const parent = this.nodeMap.get(node.parent);
+      childIndex = parent ? parent.children.indexOf(id) : -1;
+    }
+    return { childIndex, orderIndex: this.insertionOrder.indexOf(id) };
+  }
+
+  /**
+   * Phase 7 M1 — re-inserts a fully-specified node at exact positions in
+   * both ordering arrays (see `getNodeIndices`). The generic counterpart
+   * to the `add*` methods, which only append: undo of a delete must
+   * restore the node mid-list.
+   *
+   * Refuses (returns `false`, no mutation) if the id already exists or a
+   * non-null parent is missing — the same corruption classes `validate.ts`
+   * rejects on load. Indices are clamped into range rather than rejected:
+   * an out-of-range splice index would silently mean "append" anyway, so
+   * clamping just makes that explicit. The node is deep-cloned in; the
+   * caller's object never becomes internal state.
+   */
+  restoreNode(node: DocNode, childIndex: number, orderIndex: number): boolean {
+    if (this.nodeMap.has(node.id)) return false;
+    if (node.parent !== null && !this.nodeMap.has(node.parent)) return false;
+
+    const clone = structuredClone(node) as DocNode;
+    this.nodeMap.set(clone.id, clone);
+
+    const orderAt = Math.max(0, Math.min(orderIndex, this.insertionOrder.length));
+    this.insertionOrder.splice(orderAt, 0, clone.id);
+
+    if (clone.parent !== null) {
+      const parent = this.nodeMap.get(clone.parent);
+      if (parent) {
+        const childAt = Math.max(0, Math.min(childIndex, parent.children.length));
+        parent.children.splice(childAt, 0, clone.id);
+      }
+    }
+
+    this._version++;
+    return true;
+  }
+
   // ── Queries ────────────────────────────────────────────────────────────────
 
   /**

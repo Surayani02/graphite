@@ -7,11 +7,20 @@ import { type CommandContext } from "./types";
  * Assembles the `CommandContext` handed to `run`/`enabled` at dispatch
  * time. All setters below are referentially stable (useCallback([]) in
  * useEngine; Zustand actions), so this memo's identity changes only when
- * `selectedIds` does — the one live value commands read.
+ * `selectedIds` or `historyStatus` does — the two live values commands
+ * read.
  */
 export function useCommandContext(): CommandContext {
-  const { selectedIds, setSelection, deleteSelection, requestSave, updateNode } =
-    useEngineContext();
+  const {
+    selectedIds,
+    setSelection,
+    deleteSelection,
+    requestSave,
+    updateNode,
+    historyStatus,
+    undo,
+    redo,
+  } = useEngineContext();
   const setActiveTool = useUIStore((s) => s.setActiveTool);
   const toggleLayers = useUIStore((s) => s.toggleLayers);
   const toggleInspector = useUIStore((s) => s.toggleInspector);
@@ -21,7 +30,16 @@ export function useCommandContext(): CommandContext {
 
   return useMemo<CommandContext>(
     () => ({
-      engine: { selectedIds, setSelection, deleteSelection, requestSave, updateNode },
+      engine: {
+        selectedIds,
+        setSelection,
+        deleteSelection,
+        requestSave,
+        updateNode,
+        historyStatus,
+        undo,
+        redo,
+      },
       ui: {
         setActiveTool,
         toggleLeftPanel: toggleLayers,
@@ -37,6 +55,9 @@ export function useCommandContext(): CommandContext {
       deleteSelection,
       requestSave,
       updateNode,
+      historyStatus,
+      undo,
+      redo,
       setActiveTool,
       toggleLayers,
       toggleInspector,

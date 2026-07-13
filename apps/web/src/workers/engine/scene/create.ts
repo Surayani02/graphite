@@ -1,6 +1,7 @@
 import type { Color } from "@graphite/protocol";
 import type { EngineState, CreationDraft } from "../state";
 import { writePosition, writeSize, postDocumentNodes } from "./mutate";
+import { recordCompletedEdit } from "./apply";
 import { setSelection } from "../selection";
 import { post } from "../messaging";
 
@@ -33,7 +34,15 @@ export function beginCreation(
   const frameId = findTargetFrame(state, x, y);
   if (frameId === null) return; // no frame exists — nothing to parent into (shouldn't happen; every document seeds one)
 
-  state.creation = { tool, frameId, anchorX: x, anchorY: y, nodeId: null, engineId: null };
+  state.creation = {
+    tool,
+    frameId,
+    anchorX: x,
+    anchorY: y,
+    selectionBefore: state.selectedUuid !== null ? [state.selectedUuid] : [],
+    nodeId: null,
+    engineId: null,
+  };
   state.dragMode = "create";
   state.isDragging = true;
 }
@@ -109,6 +118,7 @@ export function commitCreation(state: EngineState, x: number, y: number, shift: 
 
   postDocumentNodes(state);
   setSelection(state, draft.engineId);
+  recordCreation(state, draft);
   state.creation = null;
   state.dragMode = null;
   state.isDragging = false;
@@ -187,6 +197,39 @@ function allocateNode(state: EngineState, draft: CreationDraft): void {
 
   draft.nodeId = id;
   draft.engineId = engineId;
+}
+
+/** Records the committed creation as one undoable history entry
+ * (Phase 7 M1). Document and SceneGraph were already written incrementally
+ * during the drag, so this goes through `recordCompletedEdit` — record and
+ * broadcast history state, nothing re-applied, no second `document:nodes`.
+ * The forward op snapshots the node's *final* committed bounds; undo
+ * removes it, redo re-creates it exactly as committed (never as the 1×1
+ * placeholder it briefly was). A cancelled creation records nothing —
+ * `cancelCreation` stays symmetric with "the main thread never saw it". */
+function recordCreation(state: EngineState, draft: CreationDraft): void {
+  const nodeId = draft.nodeId;
+  if (nodeId === null || !state.docModel) return;
+  const node = state.docModel.getNode(nodeId);
+  const indices = state.docModel.getNodeIndices(nodeId);
+  if (!node || !indices) return;
+
+  recordCompletedEdit(
+    state,
+    node.kind === "ellipse" ? "Create Ellipse" : "Create Rectangle",
+    [
+      {
+        forward: {
+          op: "node:create",
+          node,
+          childIndex: indices.childIndex,
+          orderIndex: indices.orderIndex,
+        },
+        inverse: { op: "node:remove", nodeId },
+      },
+    ],
+    draft.selectionBefore
+  );
 }
 
 /** Topmost root frame (last-added wins, matching hit_test's own reverse-

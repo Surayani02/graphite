@@ -4,7 +4,10 @@ import { createCommandRegistry } from "../features/commands/registry";
 import { type CommandContext } from "../features/commands/types";
 import { normalizeChord } from "../features/shortcuts/chord";
 
-function fakeContext(selectedIds: readonly string[] = []): CommandContext {
+function fakeContext(
+  selectedIds: readonly string[] = [],
+  history: { canUndo?: boolean; canRedo?: boolean } = {}
+): CommandContext {
   return {
     engine: {
       selectedIds,
@@ -12,6 +15,15 @@ function fakeContext(selectedIds: readonly string[] = []): CommandContext {
       deleteSelection: vi.fn(),
       requestSave: vi.fn(),
       updateNode: vi.fn(),
+      historyStatus: {
+        canUndo: history.canUndo ?? false,
+        canRedo: history.canRedo ?? false,
+        undoLabel: history.canUndo === true ? "Move Rectangle" : null,
+        redoLabel: history.canRedo === true ? "Move Rectangle" : null,
+        dirty: false,
+      },
+      undo: vi.fn(),
+      redo: vi.fn(),
     },
     ui: {
       setActiveTool: vi.fn(),
@@ -99,5 +111,45 @@ describe("builtinCommands", () => {
     const recorder = fakeContext();
     registry.execute("help.changeShortcut", recorder);
     expect(recorder.ui.openShortcutRecorder).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── Undo / redo (Phase 7 Milestone 1) ───────────────────────────────────────
+
+describe("edit.undo / edit.redo", () => {
+  it("undo dispatches to the engine when history allows it", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    const ctx = fakeContext([], { canUndo: true });
+    expect(registry.execute("edit.undo", ctx)).toBe(true);
+    expect(ctx.engine.undo).toHaveBeenCalledOnce();
+  });
+
+  it("undo neither runs nor calls the engine with an empty history", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    const ctx = fakeContext();
+    expect(registry.execute("edit.undo", ctx)).toBe(false);
+    expect(ctx.engine.undo).not.toHaveBeenCalled();
+  });
+
+  it("redo mirrors the same gate on canRedo", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+
+    const disabled = fakeContext();
+    expect(registry.execute("edit.redo", disabled)).toBe(false);
+    expect(disabled.engine.redo).not.toHaveBeenCalled();
+
+    const enabled = fakeContext([], { canRedo: true });
+    expect(registry.execute("edit.redo", enabled)).toBe(true);
+    expect(enabled.engine.redo).toHaveBeenCalledOnce();
+  });
+
+  it("declares the design-tool default chords", () => {
+    const undo = builtinCommands.find((c) => c.id === "edit.undo");
+    const redo = builtinCommands.find((c) => c.id === "edit.redo");
+    expect(undo?.defaultChords).toEqual(["mod+z"]);
+    expect(redo?.defaultChords).toEqual(["mod+shift+z", "mod+y"]);
   });
 });

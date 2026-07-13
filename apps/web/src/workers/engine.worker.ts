@@ -30,7 +30,14 @@ import {
 import { startRenderLoop } from "./engine/gpu/render";
 import { buildDemoScene } from "./engine/scene/demo";
 import { rebuildSceneFromDocument } from "./engine/scene/rebuild";
-import { applyNodePatch, postDocumentNodes } from "./engine/scene/mutate";
+import { postDocumentNodes } from "./engine/scene/mutate";
+import {
+  applyNodePatch,
+  markHistorySaved,
+  redoEdit,
+  resetHistory,
+  undoEdit,
+} from "./engine/scene/apply";
 import { handleWheel, notifyViewport } from "./engine/camera";
 import { handlePointerDown, handlePointerMove, handlePointerUp } from "./engine/input/pointer";
 import { handleKeyDown } from "./engine/input/keyboard";
@@ -97,6 +104,7 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
       notifyViewport(state);
       postDocumentState();
       postDocumentNodes(state);
+      resetHistory(state);
       break;
     }
 
@@ -117,11 +125,15 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
       // was actually loaded (including the demo-scene fallback above).
       postDocumentState();
       postDocumentNodes(state);
+      resetHistory(state);
       break;
     }
 
     case "document:request_save": {
       postDocumentState();
+      // The serialised state just posted is what the main thread persists
+      // — from history's point of view, the document is now saved.
+      markHistorySaved(state);
       break;
     }
 
@@ -189,6 +201,18 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
 
     case "document:delete_selection": {
       deleteSelection(state);
+      break;
+    }
+
+    // ── Phase 7 Milestone 1 ───────────────────────────────────────────────
+
+    case "history:undo": {
+      undoEdit(state);
+      break;
+    }
+
+    case "history:redo": {
+      redoEdit(state);
       break;
     }
 

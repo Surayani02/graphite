@@ -31,6 +31,16 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     updateNode: vi.fn(),
     lastEngineTool: null,
     deleteSelection: vi.fn(),
+    historyStatus: {
+      canUndo: false,
+      canRedo: false,
+      undoLabel: null,
+      redoLabel: null,
+      dirty: false,
+    },
+    historyAnnouncement: null,
+    undo: vi.fn(),
+    redo: vi.fn(),
     ...overrides,
   };
 }

@@ -1,4 +1,4 @@
-import { type NodePatch, type ToolType } from "@graphite/protocol";
+import { type HistoryStatus, type NodePatch, type ToolType } from "@graphite/protocol";
 
 /**
  * Stable, namespaced command identifier — `"<area>.<action>"`, e.g.
@@ -26,6 +26,11 @@ export interface CommandContext {
     readonly deleteSelection: () => void;
     readonly requestSave: () => void;
     readonly updateNode: (nodeId: string, patch: NodePatch) => void;
+    /** Undo/redo availability at dispatch time — drives `enabled` gates
+     *  the same way `selectedIds` gates deletion (Phase 7 M1). */
+    readonly historyStatus: HistoryStatus;
+    readonly undo: () => void;
+    readonly redo: () => void;
   };
   readonly ui: {
     readonly setActiveTool: (tool: ToolType) => void;

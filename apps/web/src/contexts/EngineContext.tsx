@@ -61,6 +61,10 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       stable.updateNode,
       stable.lastEngineTool,
       stable.deleteSelection,
+      stable.historyStatus,
+      stable.historyAnnouncement,
+      stable.undo,
+      stable.redo,
     ]
   );
 

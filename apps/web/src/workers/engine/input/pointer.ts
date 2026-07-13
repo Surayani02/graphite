@@ -3,6 +3,7 @@ import type { EngineState } from "../state";
 import { cssToWorld, notifyViewport } from "../camera";
 import { setSelection } from "../selection";
 import { writePosition, postDocumentNodes } from "../scene/mutate";
+import { recordCompletedEdit } from "../scene/apply";
 import { beginCreation, updateCreation, commitCreation } from "../scene/create";
 
 export function handlePointerDown(
@@ -106,12 +107,48 @@ export function handlePointerUp(
 
   if (state.dragMode === "move") {
     // A move-drag may have changed this node's position (see
-    // handlePointerMove above) without ever notifying the panels — send
-    // the final state once here, rather than on every intermediate
-    // pointermove, which would re-serialise and re-post the whole node
-    // list at up to 60Hz. No-op (harmless) for a click with no movement.
+    // handlePointerMove above) without ever notifying the panels — record
+    // the gesture as one undoable entry, then send the final state once
+    // here, rather than on every intermediate pointermove, which would
+    // re-serialise and re-post the whole node list at up to 60Hz. Both are
+    // no-ops (harmless) for a click with no movement.
+    recordMoveIfChanged(state);
     postDocumentNodes(state);
   }
   state.isDragging = false;
   state.dragMode = null;
+}
+
+// ─── Internals ───────────────────────────────────────────────────────────────
+
+/**
+ * Records a completed move-drag as one history entry (Phase 7 M1).
+ *
+ * The before-position is `moveStartBoundsX/Y` — captured at pointer-down
+ * from the node's bounds, i.e. exactly what the document held before the
+ * first `writePosition`. The after-position is read from the document,
+ * which the drag kept in sync at 60Hz. Equal positions mean the "drag" was
+ * a click: nothing to record. `selectionBefore` is the dragged node itself
+ * — pointer-down selected it before the drag began.
+ */
+function recordMoveIfChanged(state: EngineState): void {
+  if (state.selectedUuid === null || !state.docModel) return;
+  const node = state.docModel.getNode(state.selectedUuid);
+  if (!node) return;
+
+  const fromX = state.moveStartBoundsX;
+  const fromY = state.moveStartBoundsY;
+  if (node.x === fromX && node.y === fromY) return;
+
+  recordCompletedEdit(
+    state,
+    `Move ${node.name}`,
+    [
+      {
+        forward: { op: "node:set-props", nodeId: node.id, patch: { x: node.x, y: node.y } },
+        inverse: { op: "node:set-props", nodeId: node.id, patch: { x: fromX, y: fromY } },
+      },
+    ],
+    [node.id]
+  );
 }

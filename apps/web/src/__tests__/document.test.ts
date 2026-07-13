@@ -3,6 +3,7 @@
  * All tests run in Node.js; no DOM or Worker APIs used.
  */
 import { describe, expect, it } from "vitest";
+import type { DocNode } from "@graphite/protocol";
 import { DocumentModel } from "../document/model";
 
 const FILL = { r: 255, g: 128, b: 0, a: 255 } as const;
@@ -526,5 +527,134 @@ describe("DocumentModel.removeNode", () => {
     doc.removeNode("r1");
     expect(doc.getNode("e1")).toBeDefined();
     expect(doc.getNode("f1")?.children).toEqual(["e1"]);
+  });
+});
+
+// ─── Phase 7 M1 — setStrokeValue / getNodeIndices / restoreNode ──────────────
+
+describe("DocumentModel — setStrokeValue", () => {
+  function docWithRect() {
+    const doc = new DocumentModel();
+    doc.addFrame("f1", 0, 0, 800, 600);
+    doc.addRect("r1", "f1", 0, 0, 10, 10, FILL);
+    return doc;
+  }
+
+  it("sets an exact stroke and bumps version", () => {
+    const doc = docWithRect();
+    const before = doc.version;
+    doc.setStrokeValue("r1", { color: { r: 1, g: 2, b: 3, a: 255 }, width: 4 });
+    expect(doc.getNode("r1")?.stroke).toEqual({ color: { r: 1, g: 2, b: 3, a: 255 }, width: 4 });
+    expect(doc.version).toBe(before + 1);
+  });
+
+  it("null clears the stroke to actual null (not a transparent object)", () => {
+    const doc = docWithRect();
+    doc.setStrokeValue("r1", { color: { r: 1, g: 2, b: 3, a: 255 }, width: 4 });
+    doc.setStrokeValue("r1", null);
+    expect(doc.getNode("r1")?.stroke).toBeNull();
+  });
+
+  it("deep-clones the stroke in — later caller mutation is isolated", () => {
+    const doc = docWithRect();
+    const stroke = { color: { r: 1, g: 2, b: 3, a: 255 }, width: 4 };
+    doc.setStrokeValue("r1", stroke);
+    stroke.color.r = 99;
+    stroke.width = 99;
+    expect(doc.getNode("r1")?.stroke).toEqual({ color: { r: 1, g: 2, b: 3, a: 255 }, width: 4 });
+  });
+
+  it("is a no-op for an unknown id", () => {
+    const doc = docWithRect();
+    const before = doc.version;
+    doc.setStrokeValue("ghost", null);
+    expect(doc.version).toBe(before);
+  });
+});
+
+describe("DocumentModel — getNodeIndices", () => {
+  function threeChildren() {
+    const doc = new DocumentModel();
+    doc.addFrame("f1", 0, 0, 800, 600);
+    doc.addRect("a", "f1", 0, 0, 10, 10, FILL);
+    doc.addRect("b", "f1", 0, 0, 10, 10, FILL);
+    doc.addRect("c", "f1", 0, 0, 10, 10, FILL);
+    return doc;
+  }
+
+  it("returns the children position and the insertion-order position", () => {
+    const doc = threeChildren();
+    expect(doc.getNodeIndices("b")).toEqual({ childIndex: 1, orderIndex: 2 });
+  });
+
+  it("returns childIndex -1 for parentless roots", () => {
+    const doc = threeChildren();
+    expect(doc.getNodeIndices("f1")).toEqual({ childIndex: -1, orderIndex: 0 });
+  });
+
+  it("returns undefined for an unknown id", () => {
+    expect(threeChildren().getNodeIndices("ghost")).toBeUndefined();
+  });
+});
+
+describe("DocumentModel — restoreNode", () => {
+  function removedMiddle() {
+    const doc = new DocumentModel();
+    doc.addFrame("f1", 0, 0, 800, 600);
+    doc.addRect("a", "f1", 0, 0, 10, 10, FILL);
+    doc.addRect("b", "f1", 0, 0, 10, 10, FILL);
+    doc.addRect("c", "f1", 0, 0, 10, 10, FILL);
+    const snapshot = doc.getNode("b");
+    if (snapshot === undefined) throw new Error("fixture missing b");
+    doc.removeNode("b");
+    return { doc, snapshot };
+  }
+
+  it("splices into both ordering arrays at the given indices", () => {
+    const { doc, snapshot } = removedMiddle();
+    expect(doc.restoreNode(snapshot, 1, 2)).toBe(true);
+    expect(doc.getNode("f1")?.children).toEqual(["a", "b", "c"]);
+    expect(doc.getNodesInOrder().map((n) => n.id)).toEqual(["f1", "a", "b", "c"]);
+  });
+
+  it("clamps out-of-range indices to append", () => {
+    const { doc, snapshot } = removedMiddle();
+    expect(doc.restoreNode(snapshot, 999, 999)).toBe(true);
+    expect(doc.getNode("f1")?.children).toEqual(["a", "c", "b"]);
+    expect(doc.getNodesInOrder().map((n) => n.id)).toEqual(["f1", "a", "c", "b"]);
+  });
+
+  it("refuses a duplicate id without mutating", () => {
+    const { doc, snapshot } = removedMiddle();
+    doc.restoreNode(snapshot, 1, 2);
+    const version = doc.version;
+    expect(doc.restoreNode(snapshot, 1, 2)).toBe(false);
+    expect(doc.version).toBe(version);
+  });
+
+  it("refuses a missing parent without mutating", () => {
+    const { doc, snapshot } = removedMiddle();
+    const orphan = { ...snapshot, parent: "ghost-frame" };
+    const version = doc.version;
+    expect(doc.restoreNode(orphan, 0, 1)).toBe(false);
+    expect(doc.version).toBe(version);
+    expect(doc.getNode("b")).toBeUndefined();
+  });
+
+  it("deep-clones the node in — later caller mutation is isolated", () => {
+    const { doc, snapshot } = removedMiddle();
+    const mutable: DocNode = structuredClone(snapshot) as DocNode;
+    doc.restoreNode(mutable, 1, 2);
+    mutable.name = "Corrupted";
+    mutable.fill = { r: 0, g: 0, b: 0, a: 255 };
+    expect(doc.getNode("b")?.name).toBe("Rectangle");
+    expect(doc.getNode("b")?.fill.r).toBe(FILL.r);
+  });
+
+  it("bumps version on success", () => {
+    const { doc, snapshot } = removedMiddle();
+    const before = doc.version;
+    doc.restoreNode(snapshot, 1, 2);
+    expect(doc.version).toBe(before + 1);
   });
 });

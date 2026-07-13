@@ -21,6 +21,7 @@
 import type { SceneGraph } from "@graphite/engine";
 import { DEFAULT_CAMERA, type ToolType } from "@graphite/protocol";
 import type { DocumentModel } from "../../document/model";
+import { History } from "./history";
 
 /**
  * Phase 6 M3: was a locally-narrowed `"select" | "pan"` that the tool:set
@@ -46,6 +47,9 @@ export interface CreationDraft {
   readonly frameId: string;
   readonly anchorX: number;
   readonly anchorY: number;
+  /** Selection (node UUIDs) at gesture start — becomes the history
+   *  entry's `selectionBefore` when the creation commits (Phase 7 M1). */
+  readonly selectionBefore: readonly string[];
   nodeId: string | null;
   engineId: number | null;
 }
@@ -70,6 +74,9 @@ export interface EngineState {
   /** Bidirectional UUID ↔ arena-ID mapping, rebuilt on every scene rebuild. */
   uuidToEngineId: Map<string, number>;
   engineIdToUuid: Map<number, string>;
+  /** Undo/redo stack — Phase 7 M1. Owned here (worker) because history
+   *  entries reference document state the main thread never holds. */
+  history: History;
 
   // ── Camera (world coordinates, Y-down) ──────────────────────────────────
   camX: number;
@@ -126,6 +133,7 @@ export function createInitialState(): EngineState {
     shapeCount: 0,
     uuidToEngineId: new Map(),
     engineIdToUuid: new Map(),
+    history: new History(),
 
     camX: DEFAULT_CAMERA.x,
     camY: DEFAULT_CAMERA.y,

@@ -1,11 +1,21 @@
 /**
  * scene/remove.ts (deleteSelection) unit tests.
+ *
+ * Phase 7 M1: deletion routes through the funnel (scene/apply.ts) — same
+ * targeted engine removal and broadcasts as before, now also recorded as
+ * an undoable entry. The rebuild mock keeps @graphite/engine's WASM out
+ * of the Node test environment (funnel import chain).
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { EngineState } from "../workers/engine/state";
 import { DocumentModel } from "../document/model";
+import { History } from "../workers/engine/history";
 
-vi.mock("../workers/engine/messaging", () => ({ post: vi.fn() }));
+vi.mock("../workers/engine/messaging", () => ({
+  post: vi.fn(),
+  toErrorMsg: vi.fn((raw: unknown) => ({ type: "engine:error", message: String(raw) })),
+}));
+vi.mock("../workers/engine/scene/rebuild", () => ({ rebuildSceneFromDocument: vi.fn() }));
 
 import { deleteSelection } from "../workers/engine/scene/remove";
 import { post } from "../workers/engine/messaging";
@@ -31,6 +41,7 @@ function makeState(selectedUuid: string | null) {
     ]),
     selectedId: selectedUuid === "r1" ? 1 : selectedUuid === "f1" ? 0 : null,
     selectedUuid,
+    history: new History(),
   } as unknown as EngineState;
 
   return { state, scene };
@@ -93,5 +104,15 @@ describe("deleteSelection", () => {
     } as unknown as EngineState;
     deleteSelection(state);
     expect(scene.remove_node).not.toHaveBeenCalled();
+  });
+
+  it("records one undoable entry labelled after the deleted node (Phase 7 M1)", () => {
+    const { state } = makeState("r1");
+    deleteSelection(state);
+    expect(state.history.status()).toMatchObject({
+      canUndo: true,
+      undoLabel: "Delete Rectangle",
+    });
+    expect(post).toHaveBeenCalledWith(expect.objectContaining({ type: "history:state" }));
   });
 });

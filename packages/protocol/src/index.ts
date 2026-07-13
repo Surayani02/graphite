@@ -192,6 +192,61 @@ export interface NodePatch {
   cornerRadius?: number;
 }
 
+// ─── Document operations (Phase 7 Milestone 1) ───────────────────────────────
+
+/**
+ * One reversible document mutation — the unit the worker's history stack
+ * records and replays. Kept in the protocol package because ops are wire
+ * material: Phase 9's op-based CRDT ships exactly these shapes between
+ * peers, so they must never depend back on apps/web.
+ *
+ * The union deliberately covers only mutations the editor can currently
+ * produce (create, remove, set-props). `node:reparent` / `node:reorder`
+ * join it in the same milestone that ships their producer (layers-panel
+ * drag-reorder) — shipping them earlier would mean codifying z-order
+ * semantics no UI can yet exercise. See ADR-020.
+ */
+export type DocumentOp =
+  | {
+      readonly op: "node:create";
+      /** Complete node to (re)insert — a leaf, or a childless frame. */
+      readonly node: DocNode;
+      /**
+       * Position to splice into the parent's `children` array, as that
+       * array stands when this op is applied. `-1` for parentless roots.
+       */
+      readonly childIndex: number;
+      /**
+       * Position to splice into the document's insertion order (paint /
+       * rebuild order), as it stands when this op is applied. Without it,
+       * undoing a delete would re-add the node at the end and silently
+       * change its z-order.
+       */
+      readonly orderIndex: number;
+    }
+  | { readonly op: "node:remove"; readonly nodeId: string }
+  | { readonly op: "node:set-props"; readonly nodeId: string; readonly patch: NodePatch };
+
+/** Undo/redo availability snapshot, broadcast by the worker after every
+ *  history-affecting action (`history:state` below). `dirty` is true when
+ *  the document has changed since the last save — derived from history
+ *  position, not from `DocumentData.version`. */
+export interface HistoryStatus {
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+  /** Label of the entry `history:undo` would revert — e.g. "Move Rectangle". */
+  readonly undoLabel: string | null;
+  readonly redoLabel: string | null;
+  readonly dirty: boolean;
+}
+
+/** Attached to a `history:state` broadcast caused by an undo/redo, so the
+ *  main thread can announce it ("Undid Move Rectangle") in a live region. */
+export interface HistoryAnnounce {
+  readonly action: "undo" | "redo";
+  readonly label: string;
+}
+
 // ─── IPC — Engine Worker → Main thread ───────────────────────────────────────
 
 export type EngineToMainMessage =
@@ -232,6 +287,15 @@ export type EngineToMainMessage =
        *  sync with a decision the *engine* made, not the user. */
       readonly type: "tool:changed";
       readonly tool: ToolType;
+    }
+  // ── Phase 7 Milestone 1 ─────────────────────────────────────────────────────
+  | {
+      /** Broadcast after every history-affecting action: commit, undo,
+       *  redo, clear (document:new / document:load), and mark-saved.
+       *  `announce` is present only when the cause was an undo/redo. */
+      readonly type: "history:state";
+      readonly status: HistoryStatus;
+      readonly announce?: HistoryAnnounce | undefined;
     };
 
 // ─── IPC — Main thread → Engine Worker ───────────────────────────────────────
@@ -314,7 +378,10 @@ export type MainToEngineMessage =
        *  Delete/Backspace path reuses the existing key:down message
        *  instead — see workers/engine/input/keyboard.ts. */
       readonly type: "document:delete_selection";
-    };
+    }
+  // ── Phase 7 Milestone 1 ─────────────────────────────────────────────────────
+  | { readonly type: "history:undo" }
+  | { readonly type: "history:redo" };
 
 // ─── Performance constants ────────────────────────────────────────────────────
 
