@@ -1,5 +1,12 @@
 name: CI
 
+# Least-privilege token: modern repositories default GITHUB_TOKEN to
+# read-only, which is correct for every step here except one — the RustSec
+# action must create a check run, so the rust job alone is granted
+# checks: write below. Without these blocks the audit step 403s.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main, dev]
@@ -136,6 +143,9 @@ jobs:
   rust:
     name: Rust
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      checks: write # rustsec/audit-check publishes its result as a check run
 
     steps:
       - name: Checkout
