@@ -25,8 +25,13 @@ reviewed but not blocking. Forced-colors rendering is smoke-tested
 separately (`theme.spec.ts`) — the shell must remain visible and operable
 under `forced-colors: active`.
 
-> Reference run: paste the `playwright test a11y` summary here on the first
-> M5 CI run (date, commit, pass/fail per row).
+> **Reference run — 2026-07-15** (reference machine, tree = `f94d1c5` +
+> Phase 7 M2.5 applied, first full Playwright pass on real hardware):
+> all four rows **passed** — editor/dark 1.8 s, editor/light 1.9 s,
+> settings/dark 1.1 s, palette/dark 1.4 s — zero serious/critical
+> violations. Forced-colors smoke (`theme.spec.ts`) passed in the same run.
+> The gate has run in CI on every push since Phase 6 M5; this entry records
+> its first execution on the environment the targets are defined against.
 
 ## Manual protocol (reference machine)
 
@@ -67,9 +72,14 @@ token that fails and the fix.
 
 ## Findings and fixes
 
-| #   | Surface | Severity | Finding                         | Resolution |
-| --- | ------- | -------- | ------------------------------- | ---------- |
-| —   | —       | —        | populate on first reference run | —          |
+| #   | Surface                     | Severity | Finding                                        | Resolution |
+| --- | --------------------------- | -------- | ---------------------------------------------- | ---------- |
+| 1   | All four automated surfaces | —        | None — 0 serious/critical (2026-07-15 ref run) | n/a        |
+
+> The **manual protocol** above (keyboard-only walkthrough, NVDA smoke,
+> contrast check) has not yet been executed and recorded — automated
+> tooling covers roughly a third of WCAG, so this remains an open Phase 6
+> exit item, queued for the reference machine (~20 minutes).
 
 Fixes discovered here are committed before Phase 6 closes; this table is the
 record that the exit criterion (zero unresolved serious findings) was met.

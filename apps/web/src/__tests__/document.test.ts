@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import type { DocNode } from "@graphite/protocol";
 import { DocumentModel } from "../document/model";
+import { assertValidDocumentData, type ValidationLimits } from "../document/validate";
 
 const FILL = { r: 255, g: 128, b: 0, a: 255 } as const;
 
@@ -656,5 +657,95 @@ describe("DocumentModel — restoreNode", () => {
     const before = doc.version;
     doc.restoreNode(snapshot, 1, 2);
     expect(doc.version).toBe(before + 1);
+  });
+});
+
+// ─── Validation hardening (Phase 7 M2.5, ADR-022) ────────────────────────────
+
+describe("assertValidDocumentData — ceilings, field gaps, cycles", () => {
+  const TINY: ValidationLimits = { maxNodes: 4, maxDepth: 3, maxNameLength: 8 };
+
+  function rawNode(
+    id: string,
+    parent: string | null,
+    children: string[],
+    overrides: Record<string, unknown> = {}
+  ): Record<string, unknown> {
+    return {
+      id,
+      kind: "frame",
+      name: id,
+      x: 0,
+      y: 0,
+      w: 10,
+      h: 10,
+      fill: { r: 0, g: 0, b: 0, a: 255 },
+      stroke: null,
+      cornerRadius: 0,
+      parent,
+      children,
+      ...overrides,
+    };
+  }
+
+  function doc(nodes: Record<string, unknown>[]): unknown {
+    return { version: 1, name: "T", nodes };
+  }
+
+  it("rejects a document over the node ceiling", () => {
+    const nodes = ["a", "b", "c", "d", "e"].map((id) => rawNode(id, null, []));
+    expect(() => {
+      assertValidDocumentData(doc(nodes), TINY);
+    }).toThrow(/exceeds the 4-node ceiling/);
+  });
+
+  it("rejects nesting deeper than maxDepth", () => {
+    const nodes = [
+      rawNode("d1", null, ["d2"]),
+      rawNode("d2", "d1", ["d3"]),
+      rawNode("d3", "d2", ["d4"]),
+      rawNode("d4", "d3", []),
+    ];
+    expect(() => {
+      assertValidDocumentData(doc(nodes), TINY);
+    }).toThrow(/nests deeper than 3 levels/);
+  });
+
+  it("detects a parent cycle that every local link check accepts", () => {
+    // A↔B with mutually consistent children arrays — passes id-uniqueness,
+    // parent-exists, and children-backlink checks; only the depth walk sees
+    // that the chain never reaches a root.
+    const nodes = [rawNode("a", "b", ["b"]), rawNode("b", "a", ["a"])];
+    expect(() => {
+      assertValidDocumentData(doc(nodes), TINY);
+    }).toThrow(/parent cycle/);
+  });
+
+  it("rejects a missing name and an over-long name (unvalidated through Phase 6)", () => {
+    const missing = [rawNode("a", null, [], { name: undefined })];
+    expect(() => {
+      assertValidDocumentData(doc(missing), TINY);
+    }).toThrow(/missing or invalid name/);
+
+    const long = [rawNode("a", null, [], { name: "way-too-long" })];
+    expect(() => {
+      assertValidDocumentData(doc(long), TINY);
+    }).toThrow(/name exceeds 8 characters/);
+  });
+
+  it("rejects a non-numeric cornerRadius (unvalidated through Phase 6)", () => {
+    const nodes = [rawNode("a", null, [], { cornerRadius: "5" })];
+    expect(() => {
+      assertValidDocumentData(doc(nodes), TINY);
+    }).toThrow(/non-numeric cornerRadius/);
+  });
+
+  it("accepts real serialized documents under the production defaults", () => {
+    const model = new DocumentModel("Defaults");
+    model.addFrame("f1", 0, 0, 100, 100);
+    model.addRect("r1", "f1", 0, 0, 10, 10, FILL);
+    expect(() => {
+      assertValidDocumentData(JSON.parse(model.serialize()));
+    }).not.toThrow();
   });
 });

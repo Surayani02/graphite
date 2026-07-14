@@ -69,6 +69,14 @@ describe("parseGraphiteFile", () => {
     expect(parsed.name).toBe("Logo Draft");
   });
 
+  it("file-too-large rejects oversized input before any parsing (injected ceiling)", () => {
+    const err = expectCode(
+      () => parseGraphiteFile("x".repeat(50), FILE_MIGRATIONS, 1, 10),
+      "file-too-large"
+    );
+    expect(err.message).toContain("ceiling is 10");
+  });
+
   it("invalid-json for non-JSON input", () => {
     expectCode(() => parseGraphiteFile("{nope"), "invalid-json");
   });

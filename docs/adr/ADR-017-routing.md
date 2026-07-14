@@ -76,3 +76,44 @@ typed routing and the future tree the Blueprint committed to. Holding 160 kB
 by lazy-loading the modal layer — rejected here (hot-path cost outweighs
 ~12 kB), retained as the documented fallback if the new ceiling is later
 approached.
+
+## Status update — 2026-07-14 (Phase 7 M2.5)
+
+The watch item fired. Phase 7 M2's eager additions (FilesProvider, the
+`.graphite` format module, the FileGateway) took the main chunk from
+171.99 kB to **175.48 kB gzip — past the ceiling, with a green pipeline**,
+because the ceiling was documentation-only. Two responses, both in M2.5:
+
+1. **The sanctioned contingency was executed.** `CommandPalette` and
+   `ShortcutRecorderDialog` are code-split behind `React.lazy` in
+   `AppShell`, with an idle-time prefetch (`requestIdleCallback`, timeout
+   fallback) that warms both chunks before any human can press mod+K —
+   defusing the hot-path cost this ADR priced into the contingency. The
+   palette-open perf gate in `palette.spec.ts` is the regression tripwire.
+   The command registry stays eager; only the modal UI moved.
+2. **The ceiling is now enforced**, not prose: `scripts/check-bundle-size.mjs`
+   runs in CI immediately after the build and fails the pipeline at
+   ≥175 kB gzip on the main chunk (ADR-022). The ceiling itself is
+   unchanged — the response to a breach was the pre-committed structural
+   move, not a number edit.
+
+Post-split size is verified by that gate from this commit forward; the
+reference build records the figure in the M2.5 delivery report.
+
+## Status update — 2026-07-15 (Phase 7 M2.5b)
+
+The contingency was executed, measured on the reference machine, and
+**retired as net-negative**. Measured recovery: **0.85 kB gzip**
+(175.48 → 174.63), against this ADR's ~12 kB estimate — the modal layer's
+weight was never its own code but shared react-aria machinery that the M2
+FilesProvider dialog pins eager regardless. Measured cost: **257.5 ms cold
+palette open** on the reference machine — a 5× breach of the <50 ms budget,
+caught by the palette perf gate exactly as designed, and a direct violation
+of the M4 design note this contingency overrode ("no lazy import on the
+<50 ms hot path"). 0.85 kB for 257 ms is not a trade this project makes.
+
+The split is reverted; the palette and recorder are eagerly mounted again.
+The enforcement gate stays. Ceiling stewardship moves to **ADR-024**, which
+recalibrates the number against the measured chunk composition instead of
+against estimates. The route-level split (SettingsPage) remains the
+sanctioned pattern for genuinely separable surfaces.

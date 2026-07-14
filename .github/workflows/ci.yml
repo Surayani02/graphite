@@ -46,8 +46,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Fails on known advisories (high or critical) in production
+      # dependencies. Dev-tooling advisories arrive as Dependabot PRs
+      # instead of blocking CI; the sanctioned per-advisory override is
+      # pnpm's auditConfig.ignoreCves (documented in ADR-022).
+      - name: Audit dependencies (pnpm)
+        run: pnpm audit --prod --audit-level=high
+
       - name: Build
         run: pnpm turbo run build
+
+      # ADR-017's 175 kB gzip main-chunk ceiling, enforced (ADR-022) —
+      # added after the ceiling was breached with a green pipeline.
+      - name: Bundle size gate
+        run: node scripts/check-bundle-size.mjs
 
       - name: Type check
         run: pnpm turbo run typecheck
@@ -137,6 +149,12 @@ jobs:
 
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@v2
+
+      # RustSec advisory database check across the whole Cargo workspace.
+      - name: Security audit (RustSec)
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Format check
         run: cargo fmt --all --check

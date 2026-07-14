@@ -20,6 +20,28 @@ import type { DocNode, DocNodeKind, DocumentData } from "./model";
 
 const VALID_NODE_KINDS: ReadonlySet<DocNodeKind> = new Set(["frame", "rect", "ellipse"]);
 
+/**
+ * Resource ceilings — Phase 7 M2.5 (ADR-022). Since M2, documents cross a
+ * real trust boundary: a `.graphite` file opened from disk may come from
+ * anyone. Shape validation alone accepts a shape-perfect document engineered
+ * to exhaust the tab (millions of nodes, kilometre-deep nesting, megabyte
+ * names), so ceilings are part of validity. Injectable so tests exercise
+ * the mechanism with tiny values; production callers use the defaults.
+ */
+export interface ValidationLimits {
+  /** System ceiling from the Blueprint — 10× the MVP performance target. */
+  readonly maxNodes: number;
+  /** Far beyond any sane design; small enough to bound the depth walk. */
+  readonly maxDepth: number;
+  readonly maxNameLength: number;
+}
+
+export const DOCUMENT_LIMITS: ValidationLimits = {
+  maxNodes: 100_000,
+  maxDepth: 64,
+  maxNameLength: 512,
+};
+
 /** Type guard: is `value` a plausible `{r,g,b,a}` colour object? */
 function isColorLike(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
@@ -33,7 +55,11 @@ function isColorLike(value: unknown): boolean {
 }
 
 /** Validates a single parsed node object. Throws with a descriptive message on the first violation. */
-function assertValidNode(value: unknown, index: number): asserts value is DocNode {
+function assertValidNode(
+  value: unknown,
+  index: number,
+  limits: ValidationLimits
+): asserts value is DocNode {
   if (!value || typeof value !== "object") {
     throw new Error(`Invalid document: nodes[${index}] is not an object`);
   }
@@ -44,6 +70,23 @@ function assertValidNode(value: unknown, index: number): asserts value is DocNod
   }
   if (typeof n["kind"] !== "string" || !VALID_NODE_KINDS.has(n["kind"] as DocNodeKind)) {
     throw new Error(`Invalid document: nodes[${index}] has unknown kind "${String(n["kind"])}"`);
+  }
+  // `name` and `cornerRadius` were unvalidated through Phase 6 — a nameless
+  // node reached the layers panel as `undefined` and a non-numeric radius
+  // reached the engine. Closed during M2.5 hardening (ADR-022).
+  if (typeof n["name"] !== "string") {
+    throw new Error(`Invalid document: nodes[${index}] (${n["id"]}) has a missing or invalid name`);
+  }
+  if (n["name"].length > limits.maxNameLength) {
+    throw new Error(
+      `Invalid document: nodes[${index}] (${n["id"]}) name exceeds ` +
+        `${String(limits.maxNameLength)} characters`
+    );
+  }
+  if (typeof n["cornerRadius"] !== "number") {
+    throw new Error(
+      `Invalid document: nodes[${index}] (${n["id"]}) has a non-numeric cornerRadius`
+    );
   }
   if (
     typeof n["x"] !== "number" ||
@@ -77,7 +120,10 @@ function assertValidNode(value: unknown, index: number): asserts value is DocNod
  * Does NOT mutate `data`. Caller (`DocumentModel.fromJson`) is responsible
  * for actually constructing the model once this passes.
  */
-export function assertValidDocumentData(data: unknown): asserts data is DocumentData {
+export function assertValidDocumentData(
+  data: unknown,
+  limits: ValidationLimits = DOCUMENT_LIMITS
+): asserts data is DocumentData {
   if (!data || typeof data !== "object") {
     throw new Error("Invalid document: root value is not an object");
   }
@@ -94,8 +140,14 @@ export function assertValidDocumentData(data: unknown): asserts data is Document
   }
 
   const nodes = d["nodes"];
+  if (nodes.length > limits.maxNodes) {
+    throw new Error(
+      `Invalid document: ${String(nodes.length)} nodes exceeds the ` +
+        `${String(limits.maxNodes)}-node ceiling`
+    );
+  }
   nodes.forEach((node, i) => {
-    assertValidNode(node, i);
+    assertValidNode(node, i, limits);
   });
 
   // Structural consistency, part 1: node ids must be unique. A duplicate id
@@ -119,6 +171,41 @@ export function assertValidDocumentData(data: unknown): asserts data is Document
       throw new Error(
         `Invalid document: node "${node.id}" references missing parent "${node.parent}"`
       );
+    }
+  }
+
+  // Part 2.5: bounded depth, which doubles as cycle detection. Parts 1–3
+  // verify local link consistency, but a cycle (A.parent = B, B.parent = A,
+  // with mutually consistent children arrays) passes every local check —
+  // the renderer would silently drop both nodes while the model kept them.
+  // Walking each parent chain with a shared depth memo is O(n) total; a
+  // chain that revisits an on-path node is a cycle, and one that exceeds
+  // maxDepth is either hostile or corrupt.
+  const depthOf = new Map<string, number>();
+  for (const node of nodes as DocNode[]) {
+    if (depthOf.has(node.id)) continue;
+    const path: string[] = [];
+    const onPath = new Set<string>();
+    let cursor: DocNode | undefined = node;
+    while (cursor !== undefined && !depthOf.has(cursor.id)) {
+      if (onPath.has(cursor.id)) {
+        throw new Error(`Invalid document: parent cycle through node "${cursor.id}"`);
+      }
+      onPath.add(cursor.id);
+      path.push(cursor.id);
+      cursor = cursor.parent === null ? undefined : byId.get(cursor.parent);
+    }
+    let depth = cursor === undefined ? 0 : (depthOf.get(cursor.id) ?? 0);
+    for (let i = path.length - 1; i >= 0; i--) {
+      depth += 1;
+      const id = path[i];
+      if (id === undefined) continue;
+      if (depth > limits.maxDepth) {
+        throw new Error(
+          `Invalid document: node "${id}" nests deeper than ${String(limits.maxDepth)} levels`
+        );
+      }
+      depthOf.set(id, depth);
     }
   }
 

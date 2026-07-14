@@ -34,6 +34,13 @@ import { assertValidDocumentData } from "../../document/validate";
 
 export const GRAPHITE_FILE_EXTENSION = ".graphite";
 export const GRAPHITE_FILE_VERSION = 1;
+/**
+ * Pre-parse size ceiling (ADR-022): rejecting oversized input before
+ * `JSON.parse` bounds the memory an untrusted file can demand. 32 M UTF-16
+ * units ≈ 3 000 bytes per node at the 10k MVP scale — an order of magnitude
+ * above any document this app can produce today.
+ */
+export const MAX_GRAPHITE_FILE_CHARS = 32_000_000;
 /** Envelope JSON is plain JSON on disk; pickers filter on the extension. */
 export const GRAPHITE_FILE_MIME = "application/json";
 
@@ -48,6 +55,7 @@ export interface GraphiteFileV1 {
 }
 
 export type FileFormatErrorCode =
+  | "file-too-large"
   | "invalid-json"
   | "not-graphite"
   | "unsupported-version"
@@ -133,8 +141,16 @@ export function serializeGraphiteFile(documentJson: string, savedAt: Date = new 
 export function parseGraphiteFile(
   text: string,
   migrations: ReadonlyMap<number, FileMigration> = FILE_MIGRATIONS,
-  currentVersion: number = GRAPHITE_FILE_VERSION
+  currentVersion: number = GRAPHITE_FILE_VERSION,
+  maxChars: number = MAX_GRAPHITE_FILE_CHARS
 ): DocumentData {
+  if (text.length > maxChars) {
+    throw new FileFormatError(
+      "file-too-large",
+      `File is ${String(text.length)} characters — the ceiling is ${String(maxChars)}`
+    );
+  }
+
   let raw: unknown;
   try {
     raw = JSON.parse(text);

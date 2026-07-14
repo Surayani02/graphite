@@ -47,12 +47,14 @@ pnpm dev           # starts the dev server at http://localhost:5173
 Run the full validation suite locally — this is exactly what CI runs:
 
 ```sh
-# TypeScript
+# TypeScript (CI order)
+pnpm audit --prod --audit-level=high   # advisory gate (ADR-022)
 pnpm build
+pnpm check:bundle                      # ADR-017 ceiling, enforced (ADR-022)
 pnpm typecheck
 pnpm lint
 pnpm format:check
-pnpm test
+pnpm test                              # includes coverage floors (ADR-022)
 
 # Rust
 cargo fmt --all --check

@@ -38,6 +38,13 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ["**/dist/**", "**/pkg/**", "**/node_modules/**", "**/target/**", "**/*.gen.ts"],
+    ignores: [
+      "**/dist/**",
+      "**/pkg/**",
+      "**/node_modules/**",
+      "**/target/**",
+      "**/coverage/**",
+      "**/*.gen.ts",
+    ],
   }
 );
