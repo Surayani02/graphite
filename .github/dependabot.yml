@@ -1,0 +1,26 @@
+# Dependency update automation — Phase 7 M2.5 (ADR-022).
+# Weekly, batched per ecosystem; security advisories arrive regardless of
+# schedule. Grouped minor/patch bumps keep PR noise proportional to a
+# single-maintainer review budget.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      cargo-minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
