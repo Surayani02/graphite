@@ -55,11 +55,7 @@ export interface GraphiteFileV1 {
 }
 
 export type FileFormatErrorCode =
-  | "file-too-large"
-  | "invalid-json"
-  | "not-graphite"
-  | "unsupported-version"
-  | "invalid-document";
+  "file-too-large" | "invalid-json" | "not-graphite" | "unsupported-version" | "invalid-document";
 
 /**
  * Thrown by `parseGraphiteFile` with a stable machine code (drives which

@@ -192,5 +192,5 @@ jobs:
       # machine's history is for drift. The runner's system Node suffices.
       - name: Bench (quick) + ceilings gate
         run: |
-          cargo bench -p graphite-engine -- --warm-up-time 0.5 --measurement-time 1 --sample-size 10
+          cargo bench -p graphite-engine --bench engine -- --warm-up-time 0.5 --measurement-time 1 --sample-size 10
           node scripts/check-bench-ceilings.mjs
