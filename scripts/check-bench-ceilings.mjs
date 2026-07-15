@@ -22,8 +22,15 @@
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = dirname(new URL(import.meta.url).pathname);
+// fileURLToPath (not URL.pathname) is required for correctness on Windows:
+// pathname is always POSIX-shaped ("/E:/graphite/…", with an errant leading
+// slash before the drive letter), which path.win32's dirname/join do not
+// parse as a drive-rooted path — the corruption compounds through join()
+// into a duplicated "E:\E:\…". fileURLToPath is Node's own platform-aware
+// converter and is correct on both POSIX and Windows.
+const ROOT = dirname(fileURLToPath(import.meta.url));
 const CRITERION_DIR = join(ROOT, "..", "target", "criterion");
 const CEILINGS_PATH = join(ROOT, "..", "benchmarks", "ceilings.json");
 
@@ -81,7 +88,11 @@ const unceilinged = [];
 for (const dir of resultDirs) {
   let name, meanNs;
   try {
-    const bench = JSON.parse(readFileSync(join(dir, "..", "benchmark.json"), "utf8"));
+    // benchmark.json lives INSIDE the "new" dir, alongside estimates.json —
+    // not one level up. (Got this wrong once already; see the fixture-based
+    // test in the delivery notes — this path is now verified against a
+    // synthetic tree shaped exactly like Criterion's real output.)
+    const bench = JSON.parse(readFileSync(join(dir, "benchmark.json"), "utf8"));
     name = canonicalName(bench);
     meanNs = JSON.parse(readFileSync(join(dir, "estimates.json"), "utf8")).mean.point_estimate;
   } catch (err) {
