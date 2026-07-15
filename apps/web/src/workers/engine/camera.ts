@@ -1,6 +1,7 @@
 import { MAX_ZOOM, MIN_ZOOM } from "@graphite/protocol";
 import type { EngineState } from "./state";
 import { post } from "./messaging";
+import { markSceneDirty } from "./state";
 
 /** Converts a CSS-pixel pointer position to world-space coordinates. */
 export function cssToWorld(state: EngineState, cssX: number, cssY: number): [number, number] {
@@ -45,5 +46,6 @@ export function handleWheel(
     state.camX += deltaX / state.zoom;
     state.camY += deltaY / state.zoom;
   }
+  markSceneDirty(state);
   notifyViewport(state);
 }

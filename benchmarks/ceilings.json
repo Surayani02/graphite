@@ -1,0 +1,43 @@
+{
+  "_comment": "Absolute CI bench ceilings (ADR-023). Deliberately generous — shared GitHub runners are noisy; this gate catches order-of-magnitude regressions, not single-digit-percent drift, which the reference-machine Criterion history tracks instead. Each entry records its derivation so recalibration is an evidence exercise, not archaeology. Analytical entries are recalibrated from the first reference run at M3 exit.",
+  "scene_graph::insert_shapes/10000": {
+    "ceiling_ns": 2500000,
+    "basis": "352 µs, 2026-07-14 reference run × ~7 CI margin"
+  },
+  "scene_graph::render_list_all_visible/10000": {
+    "ceiling_ns": 2500000,
+    "basis": "331.6 µs, 2026-07-14 reference run × ~7.5 CI margin"
+  },
+  "scene_graph::render_list_mostly_culled/10000": {
+    "ceiling_ns": 100000,
+    "basis": "7.95 µs, 2026-07-14 reference run × ~12 CI margin"
+  },
+  "scene_graph::remove_node_1000": {
+    "ceiling_ns": 80000,
+    "basis": "5.97 µs, 2026-07-14 reference run × ~13 CI margin"
+  },
+  "scene_graph::set_stroke_100": {
+    "ceiling_ns": 30000,
+    "basis": "1.37 µs, 2026-07-14 reference run × ~22 CI margin"
+  },
+  "scene_graph::hit_test_miss/1000": {
+    "ceiling_ns": 30000,
+    "basis": "analytical (~1.3 µs, ADR-023 extrapolation) — recalibrate after first reference run"
+  },
+  "scene_graph::hit_test_miss/10000": {
+    "ceiling_ns": 400000,
+    "basis": "analytical (~13–30 µs, ADR-023 extrapolation) — recalibrate after first reference run"
+  },
+  "scene_graph::hit_test_miss/100000": {
+    "ceiling_ns": 5000000,
+    "basis": "analytical (~0.3–0.6 ms, ADR-023 extrapolation) — recalibrate after first reference run"
+  },
+  "scene_graph::hit_test_top_10k": {
+    "ceiling_ns": 20000,
+    "basis": "analytical (first-probe hit, ~ns-scale) — recalibrate after first reference run"
+  },
+  "scene_graph::move_node_to_index_10k": {
+    "ceiling_ns": 500000,
+    "basis": "analytical (10k-id memmove, µs-scale) — recalibrate after first reference run"
+  }
+}

@@ -4,9 +4,13 @@
  * scene rebuild mocked (the established worker-test harness; rebuild's
  * value-import of @graphite/engine must never load under Node).
  *
- * The rebuild mock honours the real function's contract — clears and
- * repopulates the uuid↔arena maps from document order and nulls the
- * selection — so selection-restore-after-rebuild is tested for real.
+ * Since Phase 7 M3 no funnel success path rebuilds — creates go through
+ * the targeted append-then-move (`insertNodeIntoScene`), which registers
+ * the uuid↔arena maps itself, so the fake scene's `add_*` return real
+ * incrementing ids. The rebuild mock stays wired (the rollback path still
+ * imports it, and any *unexpected* rebuild would trip the not-called
+ * assertions below); `fakeRebuild` keeps honouring the real contract for
+ * that eventuality.
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { EngineToMainMessage } from "@graphite/protocol";
@@ -44,7 +48,12 @@ function makeState(selectedUuid: string | null = null) {
   doc.addRect("r1", "f1", 10, 20, 100, 80, FILL);
   doc.addRect("r2", "f1", 200, 20, 50, 50, FILL);
 
+  let nextEngineId = 3; // f1=0, r1=1, r2=2 are pre-seeded below
   const scene = {
+    add_frame: vi.fn(() => nextEngineId++),
+    add_rect: vi.fn(() => nextEngineId++),
+    add_ellipse: vi.fn(() => nextEngineId++),
+    move_node_to_index: vi.fn(),
     remove_node: vi.fn(() => true),
     set_node_position: vi.fn(),
     set_size: vi.fn(),
@@ -162,8 +171,8 @@ describe("applyNodePatch through the funnel", () => {
 // ─── Deletion round-trip ─────────────────────────────────────────────────────
 
 describe("deleteSelection → undo → redo", () => {
-  it("undo restores the node at its original position in both orders", () => {
-    const { state, doc } = makeState("r1");
+  it("undo restores the node at its original position in both orders — no rebuild (M3)", () => {
+    const { state, doc, scene } = makeState("r1");
     deleteSelection(state);
     expect(doc.getNode("r1")).toBeUndefined();
     expect(state.history.status()).toMatchObject({ undoLabel: "Delete Rectangle" });
@@ -172,15 +181,21 @@ describe("deleteSelection → undo → redo", () => {
 
     expect(doc.getNode("f1")?.children).toEqual(["r1", "r2"]);
     expect(doc.getNodesInOrder().map((n) => n.id)).toEqual(["f1", "r1", "r2"]);
-    // create op → structural change → exactly one rebuild.
-    expect(rebuildSpy).toHaveBeenCalledTimes(1);
-    // Selection restored to the deleted node through the rebuilt mapping.
+    // Phase 7 M3: the create op is a targeted append-then-move, never a
+    // rebuild — the SceneGraph's explicit paint order exists for exactly
+    // this splice.
+    expect(rebuildSpy).not.toHaveBeenCalled();
+    expect(scene.add_rect).toHaveBeenCalledTimes(1);
+    expect(scene.add_rect).toHaveBeenCalledWith(0, 10, 20, 100, 80, 255, 128, 0, 255);
+    // New arena id 3, spliced back to r1's original paint slot (index 1).
+    expect(scene.move_node_to_index).toHaveBeenCalledWith(3, 1);
+    // Selection restored through the maps insertNodeIntoScene registered.
     expect(state.selectedUuid).toBe("r1");
     const selectionMsg = lastMessageOfType("selection:changed");
     expect(selectionMsg?.nodeIds).toEqual(["r1"]);
   });
 
-  it("redo removes it again with a targeted engine call — no second rebuild", () => {
+  it("redo removes it again with a targeted engine call — never a rebuild", () => {
     const { state, doc } = makeState("r1");
     deleteSelection(state);
     undoEdit(state);
@@ -223,7 +238,7 @@ describe("recordCompletedEdit", () => {
     expect(rebuildSpy).not.toHaveBeenCalled();
   });
 
-  it("a creation-style entry undoes with a targeted remove, redoes via rebuild", () => {
+  it("a creation-style entry undoes with a targeted remove, redoes with a targeted insert (M3)", () => {
     const { state, scene, doc } = makeState();
     // Simulate commitCreation's end state: node already in doc + maps.
     doc.addRect("new1", "f1", 0, 0, 100, 100, FILL);
@@ -254,7 +269,14 @@ describe("recordCompletedEdit", () => {
 
     redoEdit(state);
     expect(doc.getNode("new1")).toBeDefined();
-    expect(rebuildSpy).toHaveBeenCalledTimes(1);
+    // M3: replaying the create is append-then-move, never a rebuild. The
+    // fake's id counter was untouched by the manual map seeding above, so
+    // the re-created node lands on arena id 3 again; its paint slot is the
+    // recorded orderIndex (f1, r1, r2 precede it → 3).
+    expect(rebuildSpy).not.toHaveBeenCalled();
+    expect(scene.add_rect).toHaveBeenCalledWith(0, 0, 0, 100, 100, 255, 128, 0, 255);
+    expect(scene.move_node_to_index).toHaveBeenCalledWith(3, 3);
+    expect(state.uuidToEngineId.get("new1")).toBe(3);
   });
 });
 

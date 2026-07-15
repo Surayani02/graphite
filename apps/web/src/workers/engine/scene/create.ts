@@ -4,6 +4,7 @@ import { writePosition, writeSize, postDocumentNodes } from "./mutate";
 import { recordCompletedEdit } from "./apply";
 import { setSelection } from "../selection";
 import { post } from "../messaging";
+import { markSceneDirty } from "../state";
 
 /** Manhattan-adjacent movement (px, world units) before a click becomes a
  * drag. Below this, pointerup still produces the click default-size path —
@@ -191,6 +192,7 @@ function allocateNode(state: EngineState, draft: CreationDraft): void {
             b,
             a
           );
+    markSceneDirty(state);
     state.uuidToEngineId.set(id, engineId);
     state.engineIdToUuid.set(engineId, id);
   }

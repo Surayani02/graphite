@@ -1,6 +1,7 @@
 import type { NodeId } from "@graphite/protocol";
 import type { EngineState } from "./state";
 import { post } from "./messaging";
+import { markSceneDirty } from "./state";
 
 /**
  * Updates the engine's selection state and notifies the main thread.
@@ -12,6 +13,7 @@ import { post } from "./messaging";
  * thread (and any future inspector panel) must never see them.
  */
 export function setSelection(state: EngineState, id: number | null): void {
+  markSceneDirty(state); // the selection overlay is a rendered pass
   state.selectedId = id;
   state.selectedUuid = id !== null ? (state.engineIdToUuid.get(id) ?? null) : null;
   const nodeIds: readonly NodeId[] =

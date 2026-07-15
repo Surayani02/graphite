@@ -43,6 +43,7 @@ import { handlePointerDown, handlePointerMove, handlePointerUp } from "./engine/
 import { handleKeyDown } from "./engine/input/keyboard";
 import { setSelection } from "./engine/selection";
 import { deleteSelection } from "./engine/scene/remove";
+import { markSceneDirty } from "./engine/state";
 
 const state = createInitialState();
 
@@ -90,6 +91,7 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
     }
 
     case "engine:resize": {
+      markSceneDirty(state); // viewport change moves the cull frustum
       state.vpW = msg.width;
       state.vpH = msg.height;
       state.dpr = msg.devicePixelRatio;

@@ -26,8 +26,17 @@ export function StatusBar() {
 
       {status === "running" && (
         <>
-          <span>{stats.fps} fps</span>
-          <span>{stats.renderTimeMs.toFixed(2)} ms</span>
+          {stats.idle ? (
+            // Damage model parked the loop — zero GPU submits right now
+            // (ADR-025). A frozen "60 fps" here would be a lie; a decayed
+            // "0 fps" would look broken. "idle" is what is true.
+            <span>idle</span>
+          ) : (
+            <>
+              <span>{stats.fps} fps</span>
+              <span>{stats.renderTimeMs.toFixed(2)} ms</span>
+            </>
+          )}
           <span>zoom {zoomPct}%</span>
           {lastSaved && <span>saved {formatTime(lastSaved)}</span>}
           {selectedIds.length > 0 && <span>{selectedIds.length} selected</span>}

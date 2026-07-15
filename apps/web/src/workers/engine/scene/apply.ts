@@ -16,19 +16,20 @@
  *     Interim drag writes stay outside history by design — one gesture,
  *     one entry.
  *
- * Engine synchronisation is asymmetric on purpose:
- *   - `node:set-props` / `node:remove` mirror to the SceneGraph with the
- *     same targeted calls Phase 6 used — order-safe and cheap.
- *   - `node:create` forces a full `rebuildSceneFromDocument`: the SceneGraph
- *     can only append, but a create op may splice mid-order (undo of a
- *     mid-stack delete), and paint order must follow document order. M3's
- *     damage model replaces this with something cheaper; the funnel is the
- *     seam it plugs into.
+ * Engine synchronisation is fully targeted as of Phase 7 M3:
+ *   - `node:set-props` / `node:remove` mirror with the same calls Phase 6
+ *     used.
+ *   - `node:create` appends via the kind-specific `add_*` and then splices
+ *     to the document's paint position with `move_node_to_index` — the
+ *     SceneGraph gained an explicit paint order exactly so an undone
+ *     mid-stack delete lands back where it was. The M1 stopgap (full
+ *     rebuild per create) is retired; `rebuildSceneFromDocument` survives
+ *     only for document:load/new and the all-or-nothing rollback path.
  */
 
-import type { DocumentOp, HistoryAnnounce, NodePatch } from "@graphite/protocol";
+import type { DocNode, DocumentOp, HistoryAnnounce, NodePatch } from "@graphite/protocol";
 import { applyOp, effectiveNodePatch, isEmptyPatch, type AppliedOp } from "../../../document/ops";
-import type { EngineState } from "../state";
+import { markSceneDirty, type EngineState } from "../state";
 import { post, toErrorMsg } from "../messaging";
 import { setSelection } from "../selection";
 import { rebuildSceneFromDocument } from "./rebuild";
@@ -62,8 +63,8 @@ export function applyNodePatch(state: EngineState, nodeId: string, patch: NodePa
  *
  * `selectionAfter` (node UUIDs) is what the edit leaves selected — pass
  * `[]` to clear (deletion). When omitted, selection is left untouched
- * unless a rebuild wiped it, in which case the pre-edit selection is
- * restored. Returns `false` (nothing recorded, nothing broadcast) for an
+ * (since M3 no success path rebuilds the scene, nothing can wipe it).
+ * Returns `false` (nothing recorded, nothing broadcast) for an
  * empty batch, a missing document, or an op failure — failures roll the
  * document back and surface `engine:error`.
  */
@@ -79,18 +80,14 @@ export function commitEdit(
   const executed = executeOps(state, ops);
   if (executed === null) return false;
 
-  if (executed.needsRebuild) rebuildSceneFromDocument(state);
-
   if (selectionAfter !== undefined) {
     setSelectionByUuid(state, selectionAfter);
-  } else if (executed.needsRebuild) {
-    setSelectionByUuid(state, selectionBefore);
   }
 
   state.history.push({
     label,
-    forward: executed.applied.map((a) => a.forward),
-    inverse: executed.applied.map((a) => a.inverse).reverse(),
+    forward: executed.map((a) => a.forward),
+    inverse: executed.map((a) => a.inverse).reverse(),
     selectionBefore,
     selectionAfter: currentSelection(state),
   });
@@ -144,7 +141,6 @@ export function undoEdit(state: EngineState): void {
     return;
   }
 
-  if (executed.needsRebuild) rebuildSceneFromDocument(state);
   setSelectionByUuid(state, entry.selectionBefore);
   postDocumentNodes(state);
   postHistoryStatus(state, { action: "undo", label: entry.label });
@@ -162,7 +158,6 @@ export function redoEdit(state: EngineState): void {
     return;
   }
 
-  if (executed.needsRebuild) rebuildSceneFromDocument(state);
   setSelectionByUuid(state, entry.selectionAfter);
   postDocumentNodes(state);
   postHistoryStatus(state, { action: "redo", label: entry.label });
@@ -194,29 +189,23 @@ export function postHistoryStatus(state: EngineState, announce?: HistoryAnnounce
 
 // ─── Internals ───────────────────────────────────────────────────────────────
 
-interface ExecutedOps {
-  readonly applied: readonly AppliedOp[];
-  readonly needsRebuild: boolean;
-}
-
 /**
  * Applies a batch to document + engine. All-or-nothing: an `OpError`
  * mid-batch rolls the document back (inverses of the already-applied ops,
  * newest first), rebuilds the scene to erase any partial engine writes,
  * posts `engine:error`, and returns `null`.
  */
-function executeOps(state: EngineState, ops: readonly DocumentOp[]): ExecutedOps | null {
+function executeOps(state: EngineState, ops: readonly DocumentOp[]): readonly AppliedOp[] | null {
   const doc = state.docModel;
   if (!doc) return null;
 
   const applied: AppliedOp[] = [];
-  let needsRebuild = false;
 
   for (const op of ops) {
     try {
       const result = applyOp(doc, op);
       applied.push(result);
-      if (syncOpToEngine(state, op)) needsRebuild = true;
+      syncOpToEngine(state, op);
     } catch (err) {
       for (let i = applied.length - 1; i >= 0; i--) {
         const done = applied[i];
@@ -234,15 +223,17 @@ function executeOps(state: EngineState, ops: readonly DocumentOp[]): ExecutedOps
     }
   }
 
-  return { applied, needsRebuild };
+  return applied;
 }
 
 /** Mirrors one already-applied op to the SceneGraph. Returns `true` when
  *  the op needs a full rebuild instead of a targeted call (see module doc). */
-function syncOpToEngine(state: EngineState, op: DocumentOp): boolean {
+function syncOpToEngine(state: EngineState, op: DocumentOp): void {
+  markSceneDirty(state);
   switch (op.op) {
     case "node:create": {
-      return true;
+      insertNodeIntoScene(state, op.node, op.orderIndex);
+      return;
     }
 
     case "node:remove": {
@@ -252,12 +243,12 @@ function syncOpToEngine(state: EngineState, op: DocumentOp): boolean {
         state.engineIdToUuid.delete(engineId);
       }
       state.uuidToEngineId.delete(op.nodeId);
-      return false;
+      return;
     }
 
     case "node:set-props": {
       syncPatchToEngine(state, op.nodeId, op.patch);
-      return false;
+      return;
     }
 
     default: {
@@ -265,6 +256,74 @@ function syncOpToEngine(state: EngineState, op: DocumentOp): boolean {
       throw new Error(`Unknown document op: ${JSON.stringify(exhaustive)}`);
     }
   }
+}
+
+/**
+ * Targeted scene insertion for `node:create` — Phase 7 M3, retiring the
+ * M1 rebuild-per-create stopgap. Mirrors rebuild.ts's per-node block
+ * exactly (kind switch, corner-radius threshold, stroke-alpha threshold),
+ * registers the id maps, then splices the appended node to the document's
+ * paint position. `applyOp` has already mutated the document when this
+ * runs, so `orderIndex` names the same slot a full rebuild would produce.
+ * A dangling parent skips, mirroring rebuild's contract: a shape the
+ * layers tree can't show shouldn't be painted either.
+ */
+function insertNodeIntoScene(state: EngineState, node: DocNode, orderIndex: number): void {
+  if (!state.sceneGraph) return;
+
+  let parentEngineId = 0;
+  if (node.parent !== null) {
+    const resolved = state.uuidToEngineId.get(node.parent);
+    if (resolved === undefined) return;
+    parentEngineId = resolved;
+  }
+
+  let engineId: number;
+  if (node.kind === "frame") {
+    engineId = state.sceneGraph.add_frame(node.x, node.y, node.w, node.h);
+  } else if (node.kind === "rect") {
+    engineId = state.sceneGraph.add_rect(
+      parentEngineId,
+      node.x,
+      node.y,
+      node.w,
+      node.h,
+      node.fill.r,
+      node.fill.g,
+      node.fill.b,
+      node.fill.a
+    );
+    if (node.cornerRadius > 0) {
+      state.sceneGraph.set_corner_radius(engineId, node.cornerRadius);
+    }
+  } else {
+    engineId = state.sceneGraph.add_ellipse(
+      parentEngineId,
+      node.x,
+      node.y,
+      node.w,
+      node.h,
+      node.fill.r,
+      node.fill.g,
+      node.fill.b,
+      node.fill.a
+    );
+  }
+
+  if (node.stroke !== null && node.stroke.color.a > 0) {
+    state.sceneGraph.set_stroke(
+      engineId,
+      node.stroke.color.r,
+      node.stroke.color.g,
+      node.stroke.color.b,
+      node.stroke.color.a,
+      node.stroke.width
+    );
+  }
+
+  state.uuidToEngineId.set(node.id, engineId);
+  state.engineIdToUuid.set(engineId, node.id);
+  state.sceneGraph.move_node_to_index(engineId, orderIndex);
 }
 
 /**

@@ -37,6 +37,9 @@ import { FpsTracker } from "./fps";
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 export interface EngineStats {
+  /** True while the damage model has the render loop parked — no GPU
+   *  submits since the last frame:rendered (Phase 7 M3, ADR-025). */
+  idle: boolean;
   frameNumber: number;
   renderTimeMs: number;
   fps: number;
@@ -45,6 +48,8 @@ export interface EngineStats {
 export interface EngineBridgeEvents {
   onReady: () => void;
   onStats: (stats: EngineStats) => void;
+  // Phase 7 M3 — edge-triggered damage-model idle notice
+  onFrameIdle: () => void;
   onError: (message: string) => void;
   onSelectionChanged: (nodeIds: readonly string[]) => void;
   onViewportChanged: (x: number, y: number, zoom: number) => void;
@@ -263,12 +268,17 @@ export class EngineWorkerBridge {
       }
       case "frame:rendered": {
         this.handlers.onStats?.({
+          idle: false,
           frameNumber: msg.frameNumber,
           renderTimeMs: msg.renderTimeMs,
           // QUAL-01: FpsTracker returns a provisional estimate during the
           // first second instead of the old hard 0 — see engine/fps.ts.
           fps: this.fps.record(performance.now()),
         });
+        break;
+      }
+      case "frame:idle": {
+        this.handlers.onFrameIdle?.();
         break;
       }
       case "engine:error": {

@@ -277,6 +277,15 @@ export type EngineToMainMessage =
       readonly json: string;
       readonly requestId?: string | undefined;
     }
+  // ── Phase 7 Milestone 3 ─────────────────────────────────────────────────────
+  | {
+      /** Edge-triggered idle notice (damage model, ADR-025): the render
+       *  loop entered its clean state and stopped fetching, uploading, and
+       *  submitting. Sent once per transition — never per skipped slot —
+       *  so an idle editor generates zero message traffic; the next
+       *  `frame:rendered` is the implicit wake signal. */
+      readonly type: "frame:idle";
+    }
   // ── Phase 6 Milestone 2 ─────────────────────────────────────────────────────
   | {
       /** Full node list, pushed after document load/new and after every

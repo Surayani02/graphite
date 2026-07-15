@@ -449,3 +449,12 @@ describe("save correlation messages (Phase 7 M2)", () => {
     expect(Object.keys(msg)).toHaveLength(1);
   });
 });
+
+// ─── Phase 7 Milestone 3 — damage model ──────────────────────────────────────
+
+describe("frame:idle (Phase 7 M3)", () => {
+  it("is a bare edge-triggered notice — no payload, no cadence", () => {
+    const msg: EngineToMainMessage = { type: "frame:idle" };
+    expect(Object.keys(msg)).toHaveLength(1);
+  });
+});

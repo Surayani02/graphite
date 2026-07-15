@@ -32,7 +32,7 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
   return {
     initEngine: () => () => {},
     status: "running",
-    stats: { frameNumber: 0, renderTimeMs: 0, fps: 60 },
+    stats: { idle: false, frameNumber: 0, renderTimeMs: 0, fps: 60 },
     error: null,
     selectedIds: [],
     viewport: { x: 0, y: 0, zoom: 1 },

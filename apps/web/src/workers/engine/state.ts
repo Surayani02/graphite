@@ -108,6 +108,14 @@ export interface EngineState {
 
   // ── Render loop ──────────────────────────────────────────────────────────
   running: boolean;
+  /** Damage flag (ADR-025): anything visible changed since the last
+   *  rendered frame. The loop pays nothing while this is false — no
+   *  render-list fetch, no upload, no GPU submit. Starts true so the
+   *  first frame always paints. */
+  sceneDirty: boolean;
+  /** Edge-trigger latch: whether frame:idle was already posted for the
+   *  current clean stretch. Reset by markSceneDirty. */
+  idleNotified: boolean;
   frameNumber: number;
   lastTick: number;
 }
@@ -158,7 +166,21 @@ export function createInitialState(): EngineState {
     creation: null,
 
     running: false,
+    sceneDirty: true,
+    idleNotified: false,
     frameNumber: 0,
     lastTick: 0,
   };
+}
+
+/**
+ * Marks the scene visibly changed (ADR-025). Every seam that mutates what
+ * a frame would show calls this: the op funnel, direct drag writes,
+ * camera pan/zoom, selection changes, scene rebuilds, creation previews,
+ * and viewport resizes. Cheap enough to call redundantly — a spurious
+ * mark costs one extra frame, a missing one costs a stale screen.
+ */
+export function markSceneDirty(state: EngineState): void {
+  state.sceneDirty = true;
+  state.idleNotified = false;
 }

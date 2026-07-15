@@ -1,5 +1,6 @@
 import type { EngineState } from "../state";
 import { post } from "../messaging";
+import { markSceneDirty } from "../state";
 
 /**
  * Writes position and/or size to SceneGraph *and* DocumentModel, with no
@@ -34,6 +35,7 @@ export function writePosition(
 ): void {
   if (nodeId !== null) state.docModel?.setNodePosition(nodeId, x, y);
   if (engineId !== undefined) state.sceneGraph?.set_node_position(engineId, x, y);
+  markSceneDirty(state);
 }
 
 export function writeSize(
@@ -45,6 +47,7 @@ export function writeSize(
 ): void {
   if (nodeId !== null) state.docModel?.setSize(nodeId, w, h);
   if (engineId !== undefined) state.sceneGraph?.set_size(engineId, w, h);
+  markSceneDirty(state);
 }
 
 /**

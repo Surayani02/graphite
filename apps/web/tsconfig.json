@@ -15,6 +15,15 @@
       "@graphite/plugin-api": ["../../packages/plugin-api/src/index.ts"]
     }
   },
+  // gpu-constants.d.ts must be a root file HERE too, not only in
+  // tsconfig.worker.json: unit tests import worker modules (e.g.
+  // render-damage.test.ts → gpu/render → gpu/buffers), and TypeScript
+  // typechecks imported files even when they match `exclude` — but it
+  // does NOT load ambient declarations from excluded files. `files`
+  // entries are unconditional roots that `exclude` cannot filter, so the
+  // WebGPU constant-namespace ambients exist wherever the worker sources
+  // get pulled in. (Phase 7 M3)
+  "files": ["src/workers/gpu-constants.d.ts"],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/workers/**/*"]
 }

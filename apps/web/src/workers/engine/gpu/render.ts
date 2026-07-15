@@ -79,6 +79,43 @@ export function renderFrame(state: EngineState): number {
   return performance.now() - t0;
 }
 
+/**
+ * One frame slot under the damage model (ADR-025). A dirty scene pays the
+ * full pipeline — camera uniform, render-list fetch + upload, selection
+ * buffer, GPU submit — and clears the flag; a clean one pays nothing and
+ * posts a single edge-triggered `frame:idle` so the main thread can label
+ * idleness honestly instead of displaying a stale fps. The flag clears
+ * *before* the work (canonical order: a mark landing mid-slot survives
+ * into the next one). Exported as the unit-test seam — the self-scheduling
+ * loop around it needs live macrotasks; the decision logic doesn't.
+ * Returns GPU-submit wall time (0 for skipped slots) for the scheduler.
+ */
+export function runFrameSlot(state: EngineState, now: number): number {
+  if (!state.sceneDirty) {
+    if (!state.idleNotified) {
+      state.idleNotified = true;
+      post({ type: "frame:idle" });
+    }
+    return 0;
+  }
+  state.sceneDirty = false;
+
+  updateCameraUniform(state);
+  uploadRenderList(state);
+  if (state.selectedId !== null) updateSelectionBuffer(state);
+
+  const renderMs = renderFrame(state);
+  state.frameNumber += 1;
+
+  post({
+    type: "frame:rendered",
+    frameNumber: state.frameNumber,
+    timestamp: now,
+    renderTimeMs: renderMs,
+  });
+  return renderMs;
+}
+
 function tick(state: EngineState): void {
   if (!state.running) return;
 
@@ -87,21 +124,7 @@ function tick(state: EngineState): void {
 
   if (elapsed >= FRAME_BUDGET_MS) {
     state.lastTick = now;
-
-    updateCameraUniform(state);
-    uploadRenderList(state);
-    if (state.selectedId !== null) updateSelectionBuffer(state);
-
-    const renderMs = renderFrame(state);
-    state.frameNumber += 1;
-
-    post({
-      type: "frame:rendered",
-      frameNumber: state.frameNumber,
-      timestamp: now,
-      renderTimeMs: renderMs,
-    });
-
+    const renderMs = runFrameSlot(state, now);
     scheduleAfter(Math.max(0, FRAME_BUDGET_MS - renderMs), () => {
       tick(state);
     });

@@ -5,6 +5,7 @@ import { setSelection } from "../selection";
 import { writePosition, postDocumentNodes } from "../scene/mutate";
 import { recordCompletedEdit } from "../scene/apply";
 import { beginCreation, updateCreation, commitCreation } from "../scene/create";
+import { markSceneDirty } from "../state";
 
 export function handlePointerDown(
   state: EngineState,
@@ -73,6 +74,7 @@ export function handlePointerMove(
   if (state.dragMode === "pan") {
     state.camX = state.panStartCamX - ((cssX - state.panStartCssX) * state.dpr) / state.zoom;
     state.camY = state.panStartCamY - ((cssY - state.panStartCssY) * state.dpr) / state.zoom;
+    markSceneDirty(state);
     notifyViewport(state);
     return;
   }

@@ -183,3 +183,14 @@ jobs:
 
       - name: Bench compile check
         run: cargo bench --no-run
+
+      # Phase 7 M3 (ADR-023): quick-mode Criterion run + absolute ceilings
+      # gate. Explicit flags rather than --quick so behaviour is identical
+      # across criterion versions; ceilings live in benchmarks/ceilings.json
+      # with their derivation basis, generous enough for shared-runner noise
+      # — the gate is for order-of-magnitude regressions, the reference
+      # machine's history is for drift. The runner's system Node suffices.
+      - name: Bench (quick) + ceilings gate
+        run: |
+          cargo bench -p graphite-engine -- --warm-up-time 0.5 --measurement-time 1 --sample-size 10
+          node scripts/check-bench-ceilings.mjs

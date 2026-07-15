@@ -84,7 +84,7 @@ export interface UseEngineResult {
   redo: () => void;
 }
 
-const DEFAULT_STATS: EngineStats = { frameNumber: 0, renderTimeMs: 0, fps: 0 };
+const DEFAULT_STATS: EngineStats = { idle: false, frameNumber: 0, renderTimeMs: 0, fps: 0 };
 const DEFAULT_HISTORY_STATUS: HistoryStatus = {
   canUndo: false,
   canRedo: false,
@@ -151,6 +151,12 @@ export function useEngine(): UseEngineResult {
       })
       .on("onStats", (s) => {
         setStats(s);
+      })
+      .on("onFrameIdle", () => {
+        // Edge event, not a stats stream: merge onto the last real frame's
+        // numbers so fps/renderTime freeze honestly labelled rather than
+        // ticking a fake heartbeat (ADR-025).
+        setStats((s) => ({ ...s, idle: true }));
       })
       .on("onError", (msg) => {
         setError(msg);

@@ -10,12 +10,17 @@ use crate::scene::node::{NodeId, NodeKind, SceneNode};
 /// and a future caller may reasonably call it once per frame.
 ///
 /// Root-level recursive traversal (parent → children rendering order) is
-/// deferred until a feature actually needs it — e.g. the Phase 6+ layers
-/// panel, where re-parenting and explicit z-order become real operations.
-/// Until then, z-order is simply arena insertion order, which is what
-/// `get_render_list` and `hit_test` already use and what the existing test
-/// suite (`hit_test_returns_topmost_shape_when_overlapping`) encodes as the
-/// contract. A `roots` field previously existed here but was write-only —
+/// still deferred until a feature needs the *hierarchy* — but z-order
+/// stopped being implicit in Phase 7 M3: `order` below is the explicit
+/// paint order (back-to-front), and `get_render_list` / `hit_test`
+/// traverse it rather than the arena. The trigger was undo-of-delete: a
+/// restored node must reappear at its exact original stacking position,
+/// which an append-only arena cannot express — the alternative was a full
+/// scene rebuild on every such op (the Phase 7 M1 stopgap this replaces).
+/// The existing topmost-wins contract
+/// (`hit_test_returns_topmost_shape_when_overlapping`) is unchanged:
+/// insertion still appends to the top; `move_node_to_index` is the only
+/// way order diverges from insertion sequence. A `roots` field previously existed here but was write-only —
 /// populated by `add_frame`, never read — so it has been removed rather
 /// than carried as dead weight that misleads future contributors into
 /// thinking it drives traversal order. `children` (on `SceneNode`, below)
@@ -26,6 +31,11 @@ use crate::scene::node::{NodeId, NodeKind, SceneNode};
 #[wasm_bindgen]
 pub struct SceneGraph {
     nodes: Vec<Option<SceneNode>>,
+    /// Paint order, back-to-front, holding only live ids (`remove_node`
+    /// splices; `store` appends). The arena stays index-addressed and ids
+    /// are still never reused (ADR-008) — this vec is the single traversal
+    /// authority layered on top.
+    order: Vec<NodeId>,
     next_id: u32,
     count: u32,
 }
@@ -44,6 +54,7 @@ impl SceneGraph {
     pub fn new() -> Self {
         Self {
             nodes: Vec::new(),
+            order: Vec::new(),
             next_id: 0,
             count: 0,
         }
@@ -230,6 +241,7 @@ impl SceneGraph {
         let parent = node.parent;
 
         self.nodes[id as usize] = None;
+        self.order.retain(|&n| n != NodeId(id));
         self.count -= 1;
 
         if let Some(parent_id) = parent {
@@ -238,12 +250,34 @@ impl SceneGraph {
         true
     }
 
+    // ── Phase 7 Milestone 3 additions ────────────────────────────────────────
+
+    /// Moves a node to `index` in the paint order (0 = back-most; indices
+    /// past the top clamp to top-most). Silent no-op for a missing or
+    /// removed id, matching the `set_*` family's contract.
+    ///
+    /// This is the order-exact half of the M3 create path: the worker
+    /// appends via `add_*` (which lands on top) and then splices the node
+    /// to the document's `orderIndex` — so an undone delete reappears at
+    /// its exact original stacking position without the full scene rebuild
+    /// that Phase 7 M1 used as a stopgap. O(n) splice, single-digit
+    /// microseconds at the 10k MVP scale (`move_node_to_index_10k` bench),
+    /// and it runs once per structural edit — never per frame.
+    pub fn move_node_to_index(&mut self, id: u32, index: u32) {
+        let Some(pos) = self.order.iter().position(|&n| n == NodeId(id)) else {
+            return;
+        };
+        let node_id = self.order.remove(pos);
+        let target = (index as usize).min(self.order.len());
+        self.order.insert(target, node_id);
+    }
+
     // ── Phase 4 additions ────────────────────────────────────────────────────
 
     /// Returns the id of the top-most renderable node hit at world `(x, y)`,
     /// or `None` if nothing is hit.
     ///
-    /// Traverses in reverse insertion order so the visually topmost shape
+    /// Traverses the paint order in reverse so the visually topmost shape
     /// (drawn last) wins.  Frame nodes are never returned.
     ///
     /// Returns `Option<u32>` rather than a signed sentinel: `wasm-bindgen`
@@ -251,8 +285,13 @@ impl SceneGraph {
     /// is `undefined` instead of a magic `-1` that every call site has to
     /// remember to check for.
     pub fn hit_test(&self, x: f32, y: f32) -> Option<u32> {
-        for slot in self.nodes.iter().rev() {
-            let Some(node) = slot else { continue };
+        for node_id in self.order.iter().rev() {
+            // `order` never holds dead ids (remove_node splices them out);
+            // the double-Option guard is belt-and-braces on the arena
+            // lookup, in the codebase's silent-tolerance style.
+            let Some(Some(node)) = self.nodes.get(node_id.0 as usize) else {
+                continue;
+            };
             match &node.kind {
                 NodeKind::Frame => continue,
                 NodeKind::Rect { .. } => {
@@ -322,8 +361,10 @@ impl SceneGraph {
         };
 
         let mut out = Vec::new();
-        for slot in &self.nodes {
-            let Some(node) = slot else { continue };
+        for node_id in &self.order {
+            let Some(Some(node)) = self.nodes.get(node_id.0 as usize) else {
+                continue;
+            };
             if !node.bounds.intersects(&frustum) {
                 continue;
             }
@@ -372,6 +413,7 @@ impl SceneGraph {
         if idx >= self.nodes.len() {
             self.nodes.resize_with(idx + 1, || None);
         }
+        self.order.push(node.id);
         self.nodes[idx] = Some(node);
         self.count += 1;
     }
@@ -823,5 +865,106 @@ mod tests {
         assert_eq!(b[1], 77.0);
         assert_eq!(b[2], 100.0); // width unchanged
         assert_eq!(b[3], 80.0); // height unchanged
+    }
+
+    // ── Phase 7 Milestone 3: explicit paint order ────────────────────────────
+
+    /// Two same-bounds rects so stacking alone decides the winner.
+    fn overlapping_pair() -> (SceneGraph, u32, u32) {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let r1 = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
+        let r2 = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 0, 0, 255, 255);
+        (g, r1, r2)
+    }
+
+    #[test]
+    fn move_node_to_back_changes_the_topmost_hit() {
+        let (mut g, r1, r2) = overlapping_pair();
+        assert_eq!(g.hit_test(50.0, 50.0), Some(r2));
+        g.move_node_to_index(r2, 0);
+        assert_eq!(g.hit_test(50.0, 50.0), Some(r1));
+    }
+
+    #[test]
+    fn move_node_to_index_clamps_past_the_top() {
+        let (mut g, _r1, r2) = overlapping_pair();
+        g.move_node_to_index(r2, 0);
+        g.move_node_to_index(r2, 999);
+        assert_eq!(g.hit_test(50.0, 50.0), Some(r2));
+    }
+
+    #[test]
+    fn move_node_to_index_on_missing_id_is_a_no_op() {
+        let (mut g, _r1, r2) = overlapping_pair();
+        g.move_node_to_index(4242, 0);
+        assert_eq!(g.hit_test(50.0, 50.0), Some(r2));
+        assert_eq!(g.node_count(), 3);
+    }
+
+    #[test]
+    fn move_node_to_index_on_removed_id_is_a_no_op() {
+        let (mut g, r1, r2) = overlapping_pair();
+        assert!(g.remove_node(r2));
+        g.move_node_to_index(r2, 0);
+        assert_eq!(g.hit_test(50.0, 50.0), Some(r1));
+    }
+
+    #[test]
+    fn render_list_follows_paint_order_not_id_order() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let r1 = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
+        g.add_rect(f, 200.0, 0.0, 100.0, 100.0, 0, 0, 255, 255);
+        // Splice r1 (x = 0) to the top: the LAST 16-float record must now
+        // be r1's, so its x leads the final stride.
+        g.move_node_to_index(r1, 99);
+        let (cx, cy, z, vw, vh) = wide_cam();
+        let out = g.get_render_list(cx, cy, z, vw, vh);
+        assert_eq!(out.len(), 32);
+        assert_eq!(out[16], 0.0);
+        assert_eq!(out[0], 200.0);
+    }
+
+    #[test]
+    fn remove_node_splices_the_paint_order() {
+        let mut g = SceneGraph::new();
+        let f = g.add_frame(0.0, 0.0, 1000.0, 800.0);
+        let r1 = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
+        let r2 = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 0, 255, 0, 255);
+        let r3 = g.add_rect(f, 0.0, 0.0, 100.0, 100.0, 0, 0, 255, 255);
+        assert!(g.remove_node(r2));
+        assert_eq!(g.hit_test(50.0, 50.0), Some(r3));
+        g.move_node_to_index(r3, 0);
+        assert_eq!(g.hit_test(50.0, 50.0), Some(r1));
+    }
+
+    #[test]
+    fn undone_delete_restores_original_stacking_via_append_then_move() {
+        // The M3 story end-to-end at the graph level: bottom shape deleted,
+        // then restored by the worker's append-then-move — it must land
+        // back UNDER the survivor, exactly where it was.
+        let (mut g, r1, r2) = overlapping_pair();
+        assert!(g.remove_node(r1));
+        let restored = g.add_rect(0, 0.0, 0.0, 100.0, 100.0, 255, 0, 0, 255);
+        assert_eq!(g.hit_test(50.0, 50.0), Some(restored)); // appended on top…
+        g.move_node_to_index(restored, 1); // …then spliced to its old slot
+        assert_eq!(g.hit_test(50.0, 50.0), Some(r2));
+    }
+
+    #[test]
+    fn moving_a_frame_is_allowed_but_frames_still_never_hit() {
+        let (mut g, _r1, r2) = overlapping_pair();
+        g.move_node_to_index(0, 999);
+        assert_eq!(g.hit_test(50.0, 50.0), Some(r2));
+    }
+
+    #[test]
+    fn ids_stay_stable_across_moves() {
+        let (mut g, r1, r2) = overlapping_pair();
+        g.move_node_to_index(r1, 999);
+        g.move_node_to_index(r2, 0);
+        assert_eq!(g.get_node_bounds(r1), vec![0.0, 0.0, 100.0, 100.0]);
+        assert_eq!(g.get_node_bounds(r2), vec![0.0, 0.0, 100.0, 100.0]);
     }
 }

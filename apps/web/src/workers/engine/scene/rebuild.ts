@@ -1,6 +1,7 @@
 import { SceneGraph } from "@graphite/engine";
 import type { EngineState } from "../state";
 import { setSelection } from "../selection";
+import { markSceneDirty } from "../state";
 
 /**
  * Clears and rebuilds the SceneGraph from the current DocumentModel.
@@ -13,6 +14,7 @@ import { setSelection } from "../selection";
  */
 export function rebuildSceneFromDocument(state: EngineState): void {
   if (!state.docModel) return;
+  const rebuildStart = performance.now();
 
   state.sceneGraph = new SceneGraph();
   state.uuidToEngineId.clear();
@@ -79,4 +81,12 @@ export function rebuildSceneFromDocument(state: EngineState): void {
     state.uuidToEngineId.set(node.id, engineId);
     state.engineIdToUuid.set(engineId, node.id);
   }
+
+  markSceneDirty(state);
+  // Through-worker rebuild cost (ADR-023 measurement item): User Timing
+  // entries in the worker's own timeline, visible under the worker track
+  // of a DevTools Performance recording. Capture procedure documented in
+  // docs/benchmarks/README.md; the 10k workload arrives with M5's stress
+  // scene.
+  performance.measure("scene-rebuild", { start: rebuildStart, end: performance.now() });
 }
