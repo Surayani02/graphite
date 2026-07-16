@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useEngineContext } from "../../contexts/EngineContext";
 import { useFiles } from "../files/FilesProvider";
+import { useExport } from "../export/useExport";
 import { useUIStore } from "../../stores/uiStore";
 import { type CommandContext } from "./types";
 
@@ -23,6 +24,7 @@ export function useCommandContext(): CommandContext {
     redo,
   } = useEngineContext();
   const { save, saveAs, open, newDocument } = useFiles();
+  const { hasContent, exportSvg } = useExport();
   const setActiveTool = useUIStore((s) => s.setActiveTool);
   const toggleLayers = useUIStore((s) => s.toggleLayers);
   const toggleInspector = useUIStore((s) => s.toggleInspector);
@@ -35,6 +37,7 @@ export function useCommandContext(): CommandContext {
       engine: {
         status,
         selectedIds,
+        hasContent,
         setSelection,
         deleteSelection,
         updateNode,
@@ -43,6 +46,7 @@ export function useCommandContext(): CommandContext {
         redo,
       },
       files: { save, saveAs, open, newDocument },
+      exports: { svg: exportSvg },
       ui: {
         setActiveTool,
         toggleLeftPanel: toggleLayers,
@@ -71,6 +75,8 @@ export function useCommandContext(): CommandContext {
       openPalette,
       setLeftPanelTab,
       openShortcutRecorder,
+      hasContent,
+      exportSvg,
     ]
   );
 }

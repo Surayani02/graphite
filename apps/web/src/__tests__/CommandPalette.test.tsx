@@ -88,6 +88,7 @@ function mockFiles(overrides: Partial<FilesContextValue> = {}): FilesContextValu
     saveAs: vi.fn(),
     open: vi.fn(),
     newDocument: vi.fn(),
+    exportBlob: vi.fn(() => Promise.resolve(true)),
     ...overrides,
   };
 }

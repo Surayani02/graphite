@@ -7,6 +7,7 @@ function fakeContext(selectedIds: readonly string[] = []): CommandContext {
     engine: {
       status: "running",
       selectedIds,
+      hasContent: true,
       setSelection: vi.fn(),
       deleteSelection: vi.fn(),
       updateNode: vi.fn(),
@@ -25,6 +26,9 @@ function fakeContext(selectedIds: readonly string[] = []): CommandContext {
       saveAs: vi.fn(),
       open: vi.fn(),
       newDocument: vi.fn(),
+    },
+    exports: {
+      svg: vi.fn(),
     },
     ui: {
       setActiveTool: vi.fn(),

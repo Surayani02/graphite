@@ -7,12 +7,14 @@ import { normalizeChord } from "../features/shortcuts/chord";
 function fakeContext(
   selectedIds: readonly string[] = [],
   history: { canUndo?: boolean; canRedo?: boolean } = {},
-  status: "running" | "error" = "running"
+  status: "running" | "error" = "running",
+  hasContent = true
 ): CommandContext {
   return {
     engine: {
       status,
       selectedIds,
+      hasContent,
       setSelection: vi.fn(),
       deleteSelection: vi.fn(),
       updateNode: vi.fn(),
@@ -31,6 +33,9 @@ function fakeContext(
       saveAs: vi.fn(),
       open: vi.fn(),
       newDocument: vi.fn(),
+    },
+    exports: {
+      svg: vi.fn(),
     },
     ui: {
       setActiveTool: vi.fn(),
@@ -196,5 +201,33 @@ describe("file commands", () => {
       const ctx = fakeContext([], {}, "error");
       expect(registry.execute(id, ctx)).toBe(false);
     }
+  });
+});
+
+// ─── Phase 7 Milestone 4 — export ────────────────────────────────────────────
+
+describe("export.svg (Phase 7 M4)", () => {
+  it("routes to the export capability when running with content", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    const ctx = fakeContext();
+    expect(registry.execute("export.svg", ctx)).toBe(true);
+    expect(ctx.exports.svg).toHaveBeenCalledTimes(1);
+  });
+
+  it("is gated out while the engine is down — same contract as every file command", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    const ctx = fakeContext([], {}, "error");
+    expect(registry.execute("export.svg", ctx)).toBe(false);
+    expect(ctx.exports.svg).not.toHaveBeenCalled();
+  });
+
+  it("is gated out for an empty document — nothing to serialise beats an empty file", () => {
+    const registry = createCommandRegistry();
+    ensureBuiltinCommands(registry);
+    const ctx = fakeContext([], {}, "running", false);
+    expect(registry.execute("export.svg", ctx)).toBe(false);
+    expect(ctx.exports.svg).not.toHaveBeenCalled();
   });
 });

@@ -23,6 +23,9 @@ export interface CommandContext {
   readonly engine: {
     /** Snapshot of the canvas selection at dispatch time. */
     readonly selectedIds: readonly string[];
+    /** At least one node exists (Phase 7 M4) — export gates on it: an
+     *  empty document has nothing to serialise. */
+    readonly hasContent: boolean;
     readonly setSelection: (nodeIds: readonly string[]) => void;
     readonly deleteSelection: () => void;
     /** Engine lifecycle — file commands gate on "running": there is no
@@ -43,6 +46,11 @@ export interface CommandContext {
     readonly saveAs: () => void;
     readonly open: () => void;
     readonly newDocument: () => void;
+  };
+  /** Export actions (Phase 7 M4) — fire-and-forget like `files.*`;
+   *  serialization and the gateway handoff live in `features/export`. */
+  readonly exports: {
+    readonly svg: () => void;
   };
   readonly ui: {
     readonly setActiveTool: (tool: ToolType) => void;

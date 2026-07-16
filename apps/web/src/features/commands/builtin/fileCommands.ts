@@ -5,10 +5,14 @@ import { type CommandDescriptor } from "../types";
  * FilesProvider (`ctx.files`), which owns pickers, the `.graphite`
  * envelope, the discard guard, and confirmed-write dirty semantics.
  *
- * All four gate on the engine running: before the worker is up there is
- * no document to serialise, and nothing to load one into. "Save Document"
- * keeps its M4-era title — the settings keymap e2e greps for it, and
- * palette muscle memory is worth preserving.
+ * All of these gate on the engine running: before the worker is up there
+ * is no document to serialise, and nothing to load one into. "Save
+ * Document" keeps its M4-era title — the settings keymap e2e greps for
+ * it, and palette muscle memory is worth preserving.
+ *
+ * Export (Phase 7 M4) additionally gates on `hasContent` — an empty
+ * document has nothing to serialise, and a disabled command beats a
+ * silent no-op or an empty file.
  */
 export const fileCommands: readonly CommandDescriptor[] = [
   {
@@ -54,6 +58,19 @@ export const fileCommands: readonly CommandDescriptor[] = [
     enabled: (ctx) => ctx.engine.status === "running",
     run: (ctx) => {
       ctx.files.newDocument();
+    },
+  },
+  {
+    id: "export.svg",
+    title: "Export as SVG",
+    category: "File",
+    // No default chord: mod+e is browser-contested (Chromium search-mode)
+    // and mod+shift+e is extension-squatted — palette + custom remap only,
+    // same policy as file.new.
+    keywords: ["export", "svg", "vector", "image", "download"],
+    enabled: (ctx) => ctx.engine.status === "running" && ctx.engine.hasContent,
+    run: (ctx) => {
+      ctx.exports.svg();
     },
   },
 ];

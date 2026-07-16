@@ -39,6 +39,16 @@ export interface SaveTarget {
   readonly handle: FileSystemFileHandle | null;
 }
 
+/** Everything a picker needs to save one binary export (Phase 7 M4). */
+export interface ExportBlobOptions {
+  readonly suggestedName: string;
+  /** Picker-facing label, e.g. "SVG image". */
+  readonly description: string;
+  readonly mime: string;
+  /** Dotted extension, e.g. ".svg" — drives the FSAA accept map. */
+  readonly extension: string;
+}
+
 export interface FileGateway {
   /** True when saves can silently rewrite a retained handle. */
   readonly supportsHandles: boolean;
@@ -50,6 +60,10 @@ export interface FileGateway {
   /** Rewrites an existing handle in place. Throws on failure — the caller
    *  must not mark the document saved when this rejects. */
   writeTo(handle: FileSystemFileHandle, text: string): Promise<void>;
+  /** Saves one binary export (SVG/PNG/JPEG bytes — Phase 7 M4). Same
+   *  cancel contract as `saveAs`: `null` means the user said no. Exports
+   *  never retain handles — each is a fresh, standalone artefact. */
+  saveBlobAs(blob: Blob, opts: ExportBlobOptions): Promise<SaveTarget | null>;
 }
 
 const PICKER_TYPES = [
@@ -111,6 +125,23 @@ export function createFsaaGateway(w: Window = window): FileGateway {
       const writable = await handle.createWritable();
       await writable.write(text);
       await writable.close();
+    },
+
+    async saveBlobAs(blob: Blob, opts: ExportBlobOptions): Promise<SaveTarget | null> {
+      let handle: FileSystemFileHandle;
+      try {
+        handle = await w.showSaveFilePicker({
+          suggestedName: opts.suggestedName,
+          types: [{ description: opts.description, accept: { [opts.mime]: [opts.extension] } }],
+        });
+      } catch (err) {
+        if (isPickerCancel(err)) return null;
+        throw err;
+      }
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return { name: handle.name, handle };
     },
   };
 }
@@ -174,17 +205,13 @@ export function createDownloadGateway(doc: Document = document): FileGateway {
     },
 
     saveAs(text: string, suggestedName: string): Promise<SaveTarget | null> {
-      const url = URL.createObjectURL(new Blob([text], { type: GRAPHITE_FILE_MIME }));
-      const anchor = doc.createElement("a");
-      anchor.href = url;
-      anchor.download = suggestedName;
-      anchor.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-      }, 0);
-      // Downloads are fire-and-forget from the page's perspective:
-      // optimistic success, documented in ADR-021.
-      return Promise.resolve({ name: suggestedName, handle: null });
+      return Promise.resolve(
+        triggerDownload(doc, new Blob([text], { type: GRAPHITE_FILE_MIME }), suggestedName)
+      );
+    },
+
+    saveBlobAs(blob: Blob, opts: ExportBlobOptions): Promise<SaveTarget | null> {
+      return Promise.resolve(triggerDownload(doc, blob, opts.suggestedName));
     },
 
     writeTo(): Promise<void> {
@@ -193,6 +220,21 @@ export function createDownloadGateway(doc: Document = document): FileGateway {
       );
     },
   };
+}
+
+/** Anchor-click download — shared by the text and blob save paths.
+ *  Downloads are fire-and-forget from the page's perspective: optimistic
+ *  success, documented in ADR-021. */
+function triggerDownload(doc: Document, blob: Blob, name: string): SaveTarget {
+  const url = URL.createObjectURL(blob);
+  const anchor = doc.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  anchor.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 0);
+  return { name, handle: null };
 }
 
 // ─── Factory ─────────────────────────────────────────────────────────────────

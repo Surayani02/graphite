@@ -33,7 +33,7 @@ import {
 } from "react";
 import { ModalDialog } from "@graphite/ui-core";
 import { useEngineContext } from "../../contexts/EngineContext";
-import { createFileGateway, type FileGateway } from "./gateway";
+import { createFileGateway, type ExportBlobOptions, type FileGateway } from "./gateway";
 import {
   FileFormatError,
   parseGraphiteFile,
@@ -44,6 +44,10 @@ import {
 // ─── Context ─────────────────────────────────────────────────────────────────
 
 export interface FilesContextValue {
+  /** Saves one binary export through the gateway (Phase 7 M4). Resolves
+   *  `true` when written, `false` on user cancel; gateway failures surface
+   *  through `fileError` like every other disk operation here. */
+  readonly exportBlob: (blob: Blob, opts: ExportBlobOptions) => Promise<boolean>;
   /** Name of the associated file, or `null` before the first save/open. */
   readonly fileName: string | null;
   /** Unsaved changes relative to the file (worker history's dirty flag). */
@@ -211,10 +215,25 @@ export function FilesProvider({
     };
   }, [dirty, session]);
 
+  const exportBlob = useCallback(async (blob: Blob, opts: ExportBlobOptions): Promise<boolean> => {
+    // Same self-healing resolution as the render path above: the ref is
+    // populated on first render, and ??= narrows it for TypeScript
+    // without a dead null-branch or a banned non-null assertion.
+    const gw = (gatewayRef.current ??= createFileGateway());
+    try {
+      const target = await gw.saveBlobAs(blob, opts);
+      return target !== null;
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  }, []);
+
   // ── Context value ──────────────────────────────────────────────────────────
 
   const value = useMemo<FilesContextValue>(
     () => ({
+      exportBlob,
       fileName: session?.fileName ?? null,
       dirty,
       fileError,
@@ -223,7 +242,7 @@ export function FilesProvider({
       open,
       newDocument,
     }),
-    [session, dirty, fileError, save, saveAs, open, newDocument]
+    [session, dirty, fileError, save, saveAs, open, newDocument, exportBlob]
   );
 
   return (

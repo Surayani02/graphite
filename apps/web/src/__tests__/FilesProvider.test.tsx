@@ -70,6 +70,7 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
 function mockGateway(overrides: Partial<FileGateway> = {}): FileGateway {
   return {
     supportsHandles: false,
+    saveBlobAs: vi.fn(() => Promise.resolve(null)),
     open: vi.fn(() => Promise.resolve(null)),
     saveAs: vi.fn((_text: string, name: string) => Promise.resolve({ name, handle: null })),
     writeTo: vi.fn(() => Promise.resolve()),
@@ -157,6 +158,7 @@ describe("save", () => {
     const handle = { name: "logo.graphite" } as FileSystemFileHandle;
     const gateway = mockGateway({
       supportsHandles: true,
+      saveBlobAs: vi.fn(() => Promise.resolve(null)),
       saveAs: vi.fn(() => Promise.resolve({ name: "logo.graphite", handle })),
     });
     renderFiles(engine, gateway);
@@ -179,6 +181,7 @@ describe("save", () => {
     const handle = { name: "locked.graphite" } as FileSystemFileHandle;
     const gateway = mockGateway({
       supportsHandles: true,
+      saveBlobAs: vi.fn(() => Promise.resolve(null)),
       saveAs: vi.fn(() => Promise.resolve({ name: "locked.graphite", handle })),
       writeTo: vi.fn(() => Promise.reject(new Error("disk full"))),
     });
@@ -201,6 +204,7 @@ describe("save", () => {
     const handle = { name: "logo.graphite" } as FileSystemFileHandle;
     const gateway = mockGateway({
       supportsHandles: true,
+      saveBlobAs: vi.fn(() => Promise.resolve(null)),
       saveAs: vi.fn(() => Promise.resolve({ name: "logo.graphite", handle })),
     });
     renderFiles(engine, gateway);
@@ -322,5 +326,91 @@ describe("window title", () => {
     await waitFor(() => {
       expect(document.title).toBe("● Untitled — Graphite");
     });
+  });
+});
+
+// ─── exportBlob (Phase 7 M4) ─────────────────────────────────────────────────
+
+describe("exportBlob (Phase 7 M4)", () => {
+  function ExportProbe() {
+    const { exportBlob, fileError } = useFiles();
+    return (
+      <div>
+        <button
+          onClick={() => {
+            void exportBlob(new Blob(["<svg/>"], { type: "image/svg+xml" }), {
+              suggestedName: "x.svg",
+              description: "SVG image",
+              mime: "image/svg+xml",
+              extension: ".svg",
+            }).then((ok) => {
+              document.title = ok ? "exported" : "not-exported";
+            });
+          }}
+        >
+          export
+        </button>
+        {fileError !== null && <span role="alert">{fileError}</span>}
+      </div>
+    );
+  }
+
+  function renderExport(gateway: FileGateway) {
+    return render(
+      <EngineContext.Provider value={mockEngine()}>
+        <FilesProvider gateway={gateway}>
+          <ExportProbe />
+        </FilesProvider>
+      </EngineContext.Provider>
+    );
+  }
+
+  it("resolves true when the gateway confirms a written target", async () => {
+    const saveBlobAs = vi.fn(() => Promise.resolve({ name: "x.svg", handle: null }));
+    renderExport({
+      supportsHandles: false,
+      saveBlobAs,
+      open: vi.fn(),
+      saveAs: vi.fn(),
+      writeTo: vi.fn(),
+    } as unknown as FileGateway);
+
+    fireEvent.click(screen.getByRole("button", { name: "export" }));
+    await waitFor(() => {
+      expect(document.title).toBe("exported");
+    });
+    expect(saveBlobAs).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves false on user cancel — a normal outcome, no error surfaced", async () => {
+    renderExport({
+      supportsHandles: false,
+      saveBlobAs: vi.fn(() => Promise.resolve(null)),
+      open: vi.fn(),
+      saveAs: vi.fn(),
+      writeTo: vi.fn(),
+    } as unknown as FileGateway);
+
+    fireEvent.click(screen.getByRole("button", { name: "export" }));
+    await waitFor(() => {
+      expect(document.title).toBe("not-exported");
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("surfaces gateway failures through fileError and resolves false", async () => {
+    renderExport({
+      supportsHandles: false,
+      saveBlobAs: vi.fn(() => Promise.reject(new Error("disk full"))),
+      open: vi.fn(),
+      saveAs: vi.fn(),
+      writeTo: vi.fn(),
+    } as unknown as FileGateway);
+
+    fireEvent.click(screen.getByRole("button", { name: "export" }));
+    await waitFor(() => {
+      expect(document.title).toBe("not-exported");
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("disk full");
   });
 });

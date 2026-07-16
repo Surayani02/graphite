@@ -178,3 +178,59 @@ describe("createFileGateway", () => {
     expect(createFileGateway(bare).supportsHandles).toBe(false);
   });
 });
+
+// ─── saveBlobAs (Phase 7 M4) ─────────────────────────────────────────────────
+
+describe("saveBlobAs — binary exports (Phase 7 M4)", () => {
+  const svgBlob = () => new Blob(["<svg/>"], { type: "image/svg+xml" });
+  const opts = {
+    suggestedName: "logo.svg",
+    description: "SVG image",
+    mime: "image/svg+xml",
+    extension: ".svg",
+  } as const;
+
+  it("FSAA writes the blob through the picked handle with a format-specific picker", async () => {
+    const { handle, write, close } = fakeHandle("logo.svg");
+    const picker = vi.fn(() => Promise.resolve(handle));
+    const gw = createFsaaGateway({ showSaveFilePicker: picker } as unknown as Window);
+
+    const target = await gw.saveBlobAs(svgBlob(), opts);
+
+    expect(target).toEqual({ name: "logo.svg", handle });
+    expect(picker).toHaveBeenCalledWith({
+      suggestedName: "logo.svg",
+      types: [{ description: "SVG image", accept: { "image/svg+xml": [".svg"] } }],
+    });
+    expect(write).toHaveBeenCalledExactlyOnceWith(expect.any(Blob));
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it("FSAA maps a cancelled picker to null — same contract as saveAs", async () => {
+    const gw = createFsaaGateway({ showSaveFilePicker: abort } as unknown as Window);
+    await expect(gw.saveBlobAs(svgBlob(), opts)).resolves.toBeNull();
+  });
+
+  it("download gateway anchors the blob under the suggested name (optimistic success)", async () => {
+    const anchors: HTMLAnchorElement[] = [];
+    const original = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = original(tag);
+      if (tag === "a") {
+        anchors.push(el as HTMLAnchorElement);
+        vi.spyOn(el as HTMLAnchorElement, "click").mockImplementation(() => {});
+      }
+      return el;
+    });
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:export");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+
+    const target = await createDownloadGateway(document).saveBlobAs(svgBlob(), opts);
+
+    expect(target).toEqual({ name: "logo.svg", handle: null });
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0]?.download).toBe("logo.svg");
+    expect(anchors[0]?.href).toContain("blob:export");
+    expect(anchors[0]?.click).toHaveBeenCalledTimes(1);
+  });
+});
