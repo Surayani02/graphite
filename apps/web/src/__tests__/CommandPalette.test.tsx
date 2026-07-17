@@ -62,6 +62,7 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     getDocumentJson: vi.fn(() => Promise.resolve("{}")),
     markSaved: vi.fn(),
     exportRaster: vi.fn(() => Promise.resolve(new Uint8Array())),
+    loadStress: vi.fn(),
     nodes: NODES,
     setSelection: vi.fn(),
     updateNode: vi.fn(),

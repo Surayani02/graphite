@@ -49,9 +49,11 @@ it on the reference machine: DevTools → Performance → record → File → Op
 a document → stop; the measure appears under the engine worker's track in
 the Timings lane. The Rust half of a 10k insert is 352 µs (table below);
 this measure is the whole path — deserialise, validate, per-node WASM
-calls, map registration. The 10k _workload_ arrives with M5's seeded
-stress scene; until then the instrument stands ready and any real document
-gives a lower-bound reading.
+calls, map registration. **The 10k workload is here (Phase 7 M5):**
+the palette's dev-only "Load Stress Scene" commands build the seeded
+grid and log both measures (`stress-build` + `scene-rebuild`) in one
+console line — full capture procedure and the pending baseline tables in
+[phase7-stress.md](./phase7-stress.md).
 
 ## Baselines
 

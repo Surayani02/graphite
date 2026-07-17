@@ -15,7 +15,13 @@ import type {
   HistoryStatus,
   MainToEngineMessage,
 } from "@graphite/protocol";
-import { FRAME_BUDGET_MS, TARGET_FPS, createNodeId } from "@graphite/protocol";
+import {
+  FRAME_BUDGET_MS,
+  MVP_MAX_OBJECTS,
+  SYSTEM_MAX_OBJECTS,
+  TARGET_FPS,
+  createNodeId,
+} from "@graphite/protocol";
 
 // ─── Main → Engine ───────────────────────────────────────────────────────────
 
@@ -447,6 +453,17 @@ describe("save correlation messages (Phase 7 M2)", () => {
   it("document:mark_saved is a bare confirmation intent", () => {
     const msg: MainToEngineMessage = { type: "document:mark_saved" };
     expect(Object.keys(msg)).toHaveLength(1);
+  });
+});
+
+// ─── Phase 7 Milestone 5 — dev stress trigger ────────────────────────────────
+
+describe("debug:load_stress (Phase 7 M5)", () => {
+  it("carries the total-node count from the protocol budget constants", () => {
+    const mvp: MainToEngineMessage = { type: "debug:load_stress", count: MVP_MAX_OBJECTS };
+    const ceiling: MainToEngineMessage = { type: "debug:load_stress", count: SYSTEM_MAX_OBJECTS };
+    expect(mvp.count).toBe(10_000);
+    expect(ceiling.count).toBe(100_000);
   });
 });
 

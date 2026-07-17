@@ -20,6 +20,7 @@ function fakeContext(selectedIds: readonly string[] = []): CommandContext {
       },
       undo: vi.fn(),
       redo: vi.fn(),
+      loadStress: vi.fn(),
     },
     files: {
       save: vi.fn(),
