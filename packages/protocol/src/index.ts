@@ -450,6 +450,22 @@ export type MainToEngineMessage =
        *  write must leave the document dirty, which is exactly why M1's
        *  mark-on-request behaviour moved out of the worker. */
       readonly type: "document:mark_saved";
+    }
+  // ── Phase 7 Milestone 5 ─────────────────────────────────────────────────────
+  | {
+      /** Dev-only stress trigger (ADR-027): replace the current document
+       *  with the deterministic `count`-node stress scene and run the
+       *  exact `document:new` sequence — same rebuild, same broadcasts,
+       *  same history reset — so what M5 measures is the real product
+       *  pipeline. `count` is *total document nodes* (one root frame +
+       *  `count − 1` shapes), the same unit `validate.ts` ceilings count
+       *  in; senders pass `MVP_MAX_OBJECTS` / `SYSTEM_MAX_OBJECTS` below.
+       *  The type is unconditional (types are erased), but both the
+       *  sending command and the worker handler are compiled out of
+       *  production builds — a handcrafted postMessage in prod is a
+       *  no-op. */
+      readonly type: "debug:load_stress";
+      readonly count: number;
     };
 
 // ─── Performance constants ────────────────────────────────────────────────────

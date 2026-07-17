@@ -30,6 +30,7 @@ import {
 import { startRenderLoop } from "./engine/gpu/render";
 import { exportRaster } from "./engine/gpu/export";
 import { buildDemoScene } from "./engine/scene/demo";
+import { buildStressScene } from "./engine/scene/stress";
 import { rebuildSceneFromDocument } from "./engine/scene/rebuild";
 import { postDocumentNodes } from "./engine/scene/mutate";
 import {
@@ -257,6 +258,41 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
 
     case "document:mark_saved": {
       markHistorySaved(state);
+      break;
+    }
+
+    // ── Phase 7 Milestone 5 ───────────────────────────────────────────────
+
+    case "debug:load_stress": {
+      // Dev-only surface (ADR-027). `import.meta.env.DEV` is statically
+      // false in production builds, so this whole body — and, via
+      // tree-shaking, the generator module it references — is compiled
+      // out: a handcrafted postMessage against a production tab is a
+      // no-op, not a latent 100k-node self-DoS. In dev, the sequence
+      // below is `document:new`'s, verbatim — the stress scene must
+      // travel the exact pipeline the product uses (build → rebuild →
+      // upload → broadcasts → history reset) or its numbers measure a
+      // side channel instead of the app.
+      if (import.meta.env.DEV) {
+        buildStressScene(state, msg.count);
+        rebuildSceneFromDocument(state);
+        updateCameraUniform(state);
+        uploadRenderList(state);
+        notifyViewport(state);
+        postDocumentState();
+        postDocumentNodes(state);
+        resetHistory(state);
+        // One-line capture aid: the two User Timing measures, surfaced
+        // without opening the Performance panel. Same console.info
+        // precedent as the engine:init version banner above.
+        const buildMs = performance.getEntriesByName("stress-build").at(-1)?.duration ?? 0;
+        const rebuildMs = performance.getEntriesByName("scene-rebuild").at(-1)?.duration ?? 0;
+        // eslint-disable-next-line no-console
+        console.info(
+          `[stress] ${String(msg.count)} nodes — build ${buildMs.toFixed(1)} ms, ` +
+            `scene rebuild ${rebuildMs.toFixed(1)} ms`
+        );
+      }
       break;
     }
 

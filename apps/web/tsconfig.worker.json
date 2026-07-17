@@ -14,6 +14,6 @@
       "@graphite/plugin-api": ["../../packages/plugin-api/src/index.ts"]
     }
   },
-  "include": ["src/workers/**/*"],
+  "include": ["src/workers/**/*", "src/vite-env.d.ts"],
   "exclude": ["node_modules"]
 }
