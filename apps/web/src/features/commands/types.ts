@@ -9,8 +9,11 @@ import { type EngineStatus } from "../../hooks/useEngine";
  */
 export type CommandId = `${string}.${string}`;
 
-/** Palette grouping + future Settings-page grouping. */
-export type CommandCategory = "Tools" | "Edit" | "File" | "View" | "Help";
+/** Palette grouping + future Settings-page grouping. `Debug` is the
+ *  dev-only-surfaces category (ADR-027, Phase 7 M5): its commands register
+ *  only under `import.meta.env.DEV`, so production palettes never list the
+ *  category at all. */
+export type CommandCategory = "Tools" | "Edit" | "File" | "View" | "Help" | "Debug";
 
 /**
  * The capability surface a command may touch, assembled at dispatch time by
@@ -38,6 +41,11 @@ export interface CommandContext {
     readonly historyStatus: HistoryStatus;
     readonly undo: () => void;
     readonly redo: () => void;
+    /** Dev-only stress trigger (Phase 7 M5, ADR-027) — loads the
+     *  deterministic `count`-node stress scene. Only the DEV-gated Debug
+     *  commands call this; the worker compiles the handler out of
+     *  production builds. */
+    readonly loadStress: (count: number) => void;
   };
   /** File actions (Phase 7 M2) — fire-and-forget; FilesProvider owns the
    *  async flow, pickers, discard guard, and error surfacing. */

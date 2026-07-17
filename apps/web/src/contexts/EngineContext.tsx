@@ -70,6 +70,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       stable.getDocumentJson,
       stable.markSaved,
       stable.exportRaster,
+      stable.loadStress,
     ]
   );
 

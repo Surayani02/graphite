@@ -292,6 +292,17 @@ export class EngineWorkerBridge {
     this.worker.postMessage({ type: "history:redo" } satisfies MainToEngineMessage);
   }
 
+  // ── Debug (Phase 7 Milestone 5) ────────────────────────────────────────────
+
+  /** Dev-only stress trigger (ADR-027): asks the worker to replace the
+   *  current document with the deterministic `count`-node stress scene.
+   *  In production builds the worker compiles the handler out, so this is
+   *  a no-op there — the sending command never registers outside dev
+   *  either (see features/commands/builtin). */
+  loadStress(count: number): void {
+    this.worker.postMessage({ type: "debug:load_stress", count } satisfies MainToEngineMessage);
+  }
+
   // ── Incoming messages ─────────────────────────────────────────────────────
 
   private handleWorkerMessage(msg: EngineToMainMessage): void {

@@ -92,6 +92,12 @@ export interface UseEngineResult {
   historyAnnouncement: string | null;
   undo: () => void;
   redo: () => void;
+  // Debug (Phase 7 Milestone 5)
+  /** Dev-only stress trigger (ADR-027) — replaces the current document
+   *  with the deterministic `count`-node stress scene via the standard
+   *  load pipeline. Only the DEV-gated Debug commands call this; the
+   *  worker handler is compiled out of production builds. */
+  loadStress: (count: number) => void;
 }
 
 const DEFAULT_STATS: EngineStats = { idle: false, frameNumber: 0, renderTimeMs: 0, fps: 0 };
@@ -271,6 +277,9 @@ export function useEngine(): UseEngineResult {
   const redo = useCallback(() => {
     bridgeRef.current?.redo();
   }, []);
+  const loadStress = useCallback((count: number) => {
+    bridgeRef.current?.loadStress(count);
+  }, []);
   const requestRecoverySnapshot = useCallback(() => {
     bridgeRef.current?.requestSave();
   }, []);
@@ -339,5 +348,6 @@ export function useEngine(): UseEngineResult {
     getDocumentJson,
     markSaved,
     exportRaster,
+    loadStress,
   };
 }

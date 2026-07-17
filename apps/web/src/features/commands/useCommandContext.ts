@@ -22,6 +22,7 @@ export function useCommandContext(): CommandContext {
     historyStatus,
     undo,
     redo,
+    loadStress,
   } = useEngineContext();
   const { save, saveAs, open, newDocument } = useFiles();
   const { hasContent, openDialog } = useExport();
@@ -44,6 +45,7 @@ export function useCommandContext(): CommandContext {
         historyStatus,
         undo,
         redo,
+        loadStress,
       },
       files: { save, saveAs, open, newDocument },
       exports: { open: openDialog },
@@ -65,6 +67,7 @@ export function useCommandContext(): CommandContext {
       historyStatus,
       undo,
       redo,
+      loadStress,
       save,
       saveAs,
       open,
