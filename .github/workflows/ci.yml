@@ -63,8 +63,11 @@ jobs:
       - name: Build
         run: pnpm turbo run build
 
-      # ADR-017's 175 kB gzip main-chunk ceiling, enforced (ADR-022) —
-      # added after the ceiling was breached with a green pipeline.
+      # ADR-024's 190 kB gzip main-chunk ceiling (recalibrated from
+      # ADR-017's original 175 kB), enforced (ADR-022) — the gate was
+      # added after the original ceiling was breached with a green
+      # pipeline. scripts/check-bundle-size.mjs is the source of truth
+      # for the number.
       - name: Bundle size gate
         run: node scripts/check-bundle-size.mjs
 

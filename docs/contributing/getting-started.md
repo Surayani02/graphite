@@ -44,27 +44,41 @@ pnpm dev           # starts the dev server at http://localhost:5173
 
 ## Before opening a PR
 
-Run the full validation suite locally — this is exactly what CI runs:
+Run the full validation suite locally. This list is enumerated from
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) — **if this
+file and `ci.yml` ever disagree, `ci.yml` wins** and this file has a bug
+(a manually-recalled gate list has caused a CI failure before; the
+workflow file is the only source of truth):
 
 ```sh
-# TypeScript (CI order)
+# TypeScript job (CI order)
+pnpm install --frozen-lockfile         # the lockfile is the contract
 pnpm audit --prod --audit-level=high   # advisory gate (ADR-022)
 pnpm build
-pnpm check:bundle                      # ADR-017 ceiling, enforced (ADR-022)
+pnpm check:bundle                      # 190 kB main-chunk ceiling (ADR-024), enforced (ADR-022)
 pnpm typecheck
 pnpm lint
 pnpm format:check
 pnpm test                              # includes coverage floors (ADR-022)
+pnpm --filter @graphite/web exec tsc --noEmit -p tsconfig.e2e.json
 
-# Rust
+# E2E job (production build + preview; Chromium)
+pnpm --filter @graphite/web run e2e
+
+# Rust job
+cargo audit                            # RustSec advisories (CI uses rustsec/audit-check)
 cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-targets
+cargo check --all-targets
+cargo check --target wasm32-unknown-unknown -p graphite-engine
 cargo bench --no-run
+cargo bench -p graphite-engine --bench engine -- --warm-up-time 0.5 --measurement-time 1 --sample-size 10
+node scripts/check-bench-ceilings.mjs  # absolute Criterion ceilings (ADR-023, benchmarks/ceilings.json)
 ```
 
-All eight commands must pass with zero errors and zero warnings before
-requesting review.
+Everything must pass with zero errors and zero warnings before requesting
+review.
 
 ## Conventions
 

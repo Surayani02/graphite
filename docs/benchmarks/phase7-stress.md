@@ -55,10 +55,17 @@ Run the full set at **10k first**, record, then repeat at **100k**.
    guard drops it — expect one `failed to persist` console error at
    load, which is the guard working, not a defect.)
 3. **Steady-state render.** HUD FPS while continuously panning for
-   ~10 s, in two framings: (a) default camera — a handful of shapes
-   visible, the mostly-culled case; (b) zoomed out until the whole grid
-   is visible — the all-visible case, `render_list_all_visible`'s
-   through-app twin. The damage model parks the loop when idle
+   ~10 s (pan tool, or middle-mouse drag), in two framings: (a) **default
+   camera** — a handful of shapes visible, the mostly-culled case; (b)
+   **minimum zoom** — wheel out until the HUD reads **10 %** (`MIN_ZOOM`).
+   At 10k that fits the grid's full ~11,000-unit width on any
+   ≥ 1,100-px-wide viewport, with roughly 7k of the 10k shapes inside an
+   ~800-px-tall frustum. At 100k the full grid is unreachable **by
+   design** — its ~110,000-unit height needs ~0.7 % zoom against a 10 %
+   floor — so the frustum again holds ≈ 7k shapes: the 100k framing
+   measures _culling over 100k nodes with a ~7k upload_, not drawing
+   100k at once (the all-visible twin lives in Criterion as
+   `render_list` at scale). The damage model parks the loop when idle
    (ADR-025), so read the HUD **while interacting**; an idle "—" is
    correct behaviour, not a stall.
 4. **Selection response.** Record a Performance profile while clicking
@@ -71,8 +78,22 @@ Run the full set at **10k first**, record, then repeat at **100k**.
    (`hit_test_miss/10k`, `/100k`) are already CI-gated; enter their
    latest reference-run means alongside for the composed picture.
 6. **Export at scale.** File → Export: SVG, then PNG at 1×. Record wall
-   time to the save dialog and success/failure. (No numeric target —
-   export is a deliberate wait; the record is for regression tracking.)
+   time to the save dialog and success/failure. Two outcomes are
+   **pre-registered from code reading**, so record against them rather
+   than being surprised: (a) `contentBounds` includes _every_ node —
+   frames too — so the stress scene's 100,000-unit Criterion-parity root
+   frame drives the fit bounds to ~102,000 world units: **SVG should
+   succeed** (a valid multi-MB file) but depict the grid as a small
+   cluster in a mostly-empty artboard. (b) **Raster is expected to
+   fail**: ~104,000 px at 1× exceeds WebGPU's default
+   `maxTextureDimension2D` (8,192 — the device is requested with no
+   `requiredLimits`) and the readback buffer would dwarf
+   `maxBufferSize`; the failure should surface as a clean export error
+   through the existing `export:error` path (the promise settles — the
+   dialog must not hang). Record the exact error text. Both are M5
+   _findings_, not capture blockers — the closeout decides between a
+   raster device-limit clamp, frame-exclusion in `contentBounds`, or
+   both (ADR-026 follow-up).
 7. **UI honesty checks (record observations, not verdicts).** With 100k
    loaded: Layers panel scroll behaviour (it renders real rows — not
    virtualized, a known edge), palette responsiveness while typing a
@@ -87,11 +108,11 @@ Run the full set at **10k first**, record, then repeat at **100k**.
 | Through-worker load (build + rebuild) | < 1 s              | _pending_ | _pending_ |
 | Reload via `document:load`            | < 1 s              | _pending_ | _pending_ |
 | Steady render, mostly-culled          | ≥ 58 fps HUD       | _pending_ | _pending_ |
-| Steady render, all-visible            | ≥ 58 fps HUD       | _pending_ | _pending_ |
+| Steady render, min-zoom (10 %)        | ≥ 58 fps HUD       | _pending_ | _pending_ |
 | Selection response (median / worst)   | < 16 ms            | _pending_ | _pending_ |
 | Hit-test miss, in-app                 | < 1 ms             | _pending_ | _pending_ |
 | Hit-test miss, Criterion reference    | < 1 ms             | _pending_ | _pending_ |
-| Export SVG / PNG 1× (wall)            | record             | _pending_ | —         |
+| Export SVG / PNG 1× (wall, step 6)    | pre-registered     | _pending_ | —         |
 
 ## Results — 100k (system ceiling probe)
 
@@ -99,7 +120,7 @@ Run the full set at **10k first**, record, then repeat at **100k**.
 | --------------------------------- | --------------- | --------- | ----- |
 | Through-worker load               | record          | _pending_ |       |
 | Steady render, mostly-culled      | record          | _pending_ |       |
-| Steady render, all-visible        | record          | _pending_ |       |
+| Steady render, min-zoom (10 %)    | record          | _pending_ |       |
 | Selection response                | record          | _pending_ |       |
 | Hit-test miss, in-app             | informs ADR-023 | _pending_ |       |
 | Layers / palette / broadcast jank | observations    | _pending_ |       |

@@ -2,7 +2,7 @@
 
 Open-source, browser-based, high-performance collaborative graphics platform.
 
-> **Status**: ✅ Phase 6 (UI Shell) complete — design tokens, app shell, Layers + Inspector panels, tools rail with shape creation, context menus, command palette with layer search, remappable keyboard shortcuts, tabbed Layers/Assets panel, client routing with a settings page, light + high-contrast theming, and the accessibility + E2E exit gate. Phase 7 (MVP: save/load, export, undo/redo) next.
+> **Status**: 🔄 Phase 7 (MVP) in flight — M1–M5 delivered: undo/redo (ADR-020), `.graphite` save/load with autosave (ADR-021), damage-model rendering + honest hit-test benches with CI-gated Criterion ceilings (ADR-025), SVG + PNG/JPEG export (ADR-026), and the deterministic 10k/100k stress probe behind dev-only Debug commands (ADR-027). Remaining: the reference-machine capture ([docs/benchmarks/phase7-stress.md](docs/benchmarks/phase7-stress.md)) — the Phase 7 exit gate. Phase 6 (UI shell: design tokens, app shell, panels, tools, palette, shortcuts, routing, theming, a11y + E2E gate) and everything before it: ✅ complete.
 
 ## Prerequisites
 
@@ -45,16 +45,20 @@ for the full pre-PR checklist.
 
 ```
 graphite/
-├── apps/web React + Vite browser application
-├── apps/server Rust + Axum backend (Phase 8)
+├── apps/
+│   ├── web            React + Vite browser application
+│   └── server         Rust + Axum backend (Phase 8)
 ├── packages/
-│ ├── protocol Shared TypeScript types (IPC + network schema)
-│ ├── engine Rust graphics engine → WASM
-│ ├── document Placeholder — see docs/adr/ADR-010
-│ ├── crdt CRDT collaboration (Phase 9)
-│ ├── ui-core React UI components (Phase 6)
-│ └── plugin-api Plugin system API (Phase 10+)
-└── docs/adr Architecture Decision Records
+│   ├── protocol       Shared TypeScript types (IPC + network schema)
+│   ├── engine         Rust graphics engine → WASM
+│   ├── document       Placeholder — see docs/adr/ADR-010
+│   ├── crdt           CRDT collaboration (Phase 9)
+│   ├── ui-core        Design tokens + React primitives (Phase 6+)
+│   └── plugin-api     Plugin system API (Phase 10+)
+└── docs/
+    ├── BLUEPRINT.md   Engineering blueprint — the map
+    ├── adr/           Architecture Decision Records
+    └── benchmarks/    Recorded baselines + capture procedures
 ```
 
 ## Development phases

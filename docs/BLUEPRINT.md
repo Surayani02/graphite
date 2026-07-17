@@ -1,8 +1,10 @@
-# Graphite — Engineering Blueprint (v2)
+# Graphite — Engineering Blueprint (v3)
 
 Condensed architecture reference. Decisions live in [`adr/`](./adr/); this
-document is the map. Supersedes the v1 blueprint (2026-06-30) — updated
-2026-07-08 for the Phase 6 complete state (M5 = phase exit).
+document is the map. Supersedes v2 (2026-07-08, Phase-6 state) — updated
+2026-07-17 for the Phase 7 M5-delivered state (the reference-machine
+capture, [benchmarks/phase7-stress.md](./benchmarks/phase7-stress.md), is
+the phase exit gate).
 
 ## What Graphite is
 
@@ -15,35 +17,45 @@ owns UI chrome only.
 ## Runtime architecture
 
 ```
-Main thread   React 19 shell: AppShell grid → TopToolbar / Layers / Viewport /
-Inspector / StatusBar  (M3: tools rail, menus · M4: tabbed
-left panel, command palette, shortcut recorder)
-Zustand uiStore — UI intent only, persisted "graphite-ui-v1"
-EngineContext (stable, memoised) + EngineFrameContext (60Hz
-stats/viewport; StatusBar only) — ADR-013 §6
-useSyncToolWithEngine — the only UI→engine crossing
-Command registry + ShortcutProvider (M4, ADR-015): palette and
-shortcuts are two views of one command list
-TanStack Router (M5, ADR-017): "/" editor · "/settings" (lazy);
-engine + shortcuts are editor-route-scoped
-PanelDescriptor registry (M5, ADR-019): shell places areas, the
-registry decides panels · theme = CSS-var swap (M5, ADR-018)
-EngineWorkerBridge — typed senders + FpsTracker
-│  @graphite/protocol — versioned, JSON-serialisable IPC contract
+Main thread   React 19 shell: AppShell grid → TopToolbar / Layers|Assets /
+              Viewport / Inspector / StatusBar (fps · frame-ms · zoom HUD,
+              history live-region) · tools rail · context menus · palette
+              Zustand uiStore — UI intent only, persisted "graphite-ui-v1"
+              EngineContext (stable, memoised) + EngineFrameContext (60 Hz
+              stats/viewport; StatusBar only) — ADR-013 §6
+              Command registry + ShortcutProvider (ADR-015): palette and
+              shortcuts are two views of one command list · Debug category
+              is dev-only, compiled out of production builds (ADR-027)
+              FilesProvider + FileGateway — FS Access API with download
+              fallback, .graphite format (ADR-021) · useExport — SVG built
+              on the main thread from the live node snapshot (ADR-026)
+              TanStack Router (ADR-017): "/" editor · "/settings" (lazy) ·
+              PanelDescriptor registry (ADR-019) · theme = CSS-var swap
+              (ADR-018) · useSyncToolWithEngine — the UI→engine crossing
+              EngineWorkerBridge — typed senders, FpsTracker, promise-
+              correlated save/export requests
+      │  @graphite/protocol — versioned, JSON-serialisable IPC contract
 Worker        engine.worker.ts orchestrator over one shared EngineState:
-gpu/{shader,pipeline,context,buffers,render} · input/{pointer,
-keyboard} · scene/{demo,rebuild,mutate} · camera · selection
-DocumentModel (TypeScript, worker-owned SOURCE OF TRUTH,
-UUID keys, _version, validate.ts) — ADR-011
-Hybrid MessageChannel+setTimeout render loop (~60 fps)
-localStorage: graphite-document-v1 (auto-save + Ctrl+S)
-│  wasm-bindgen — ADR-004/005
+              gpu/{shader,pipeline,context,buffers,render,export} ·
+              input/{pointer,keyboard} · scene/{create,mutate,remove,
+              apply,rebuild,demo,stress} · camera · selection · history
+              (op-sourced undo/redo — ADR-020)
+              DocumentModel (TypeScript, worker-owned SOURCE OF TRUTH,
+              UUID keys, _version, validate.ts ceilings) — ADR-011/022
+              Damage-model render loop (ADR-025): MessageChannel+setTimeout
+              ~60 fps, parks when idle, wakes on damage · raster export =
+              off-screen rgba8 render + GPU readback (ADR-026) ·
+              debug:load_stress — dev-only 10k/100k scenes (ADR-027)
+              localStorage: graphite-document-v1 (auto-save, quota-guarded)
+      │  wasm-bindgen — ADR-004/005
 Rust/WASM     @graphite/engine SceneGraph: arena slot-map (ADR-008), ids
-never reused, hit_test → Option<u32>, incremental setters,
-get_render_list → flat 16-f32/shape, frustum-culled
-│  Float32Array → storage buffer (destroy + double on overflow)
+              never reused, explicit paint order (order: Vec<NodeId>,
+              ADR-025), hit_test → Option<u32> reverse paint-order scan,
+              incremental setters, get_render_list → flat 16-f32/shape,
+              frustum-culled · Criterion benches with CI-gated ceilings
+      │  Float32Array → storage buffer (destroy + double on overflow)
 WebGPU        One instanced SDF draw (rect/round-rect/ellipse, 1-px AA via
-pixel_size, centre strokes, Porter-Duff) + selection overlay
+              pixel_size, centre strokes, Porter-Duff) + selection overlay
 ```
 
 **Layer ownership (non-negotiable):** React owns panels, dialogs, menus,
@@ -68,14 +80,14 @@ stays off (ADR-003).
 
 ## Phases and milestones
 
-| Phase | Scope                                                                              | Status      |
-| ----- | ---------------------------------------------------------------------------------- | ----------- |
-| 0–5   | Foundation → engine → rendering → interaction → document model                     | ✅ Complete |
-| 6     | UI shell                                                                           | ✅ Complete |
-| 7     | **MVP**: file save/load, export, undo/redo, R-tree + dirty flags, 10k verification | ⏳          |
-| 8     | Backend: Axum, PostgreSQL, Redis, JWT auth, S3                                     | ⏳          |
-| 9     | Collaboration: Yjs CRDT + WebSocket sync                                           | ⏳          |
-| 10+   | Plugins, components, variables, offline, docking                                   | ⏳          |
+| Phase | Scope                                                                                                                                      | Status      |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| 0–5   | Foundation → engine → rendering → interaction → document model                                                                             | ✅ Complete |
+| 6     | UI shell                                                                                                                                   | ✅ Complete |
+| 7     | **MVP**: file save/load, export, undo/redo, damage model (dirty flags), 10k verification — spatial index deferred by measurement (ADR-023) | ⏳          |
+| 8     | Backend: Axum, PostgreSQL, Redis, JWT auth, S3                                                                                             | ⏳          |
+| 9     | Collaboration: Yjs CRDT + WebSocket sync                                                                                                   | ⏳          |
+| 10+   | Plugins, components, variables, offline, docking                                                                                           | ⏳          |
 
 Phase 6 milestones: **M1** design tokens + app shell (✅) · **M2** Layers +
 Inspector (✅) · **M3** tools rail, rectangle/ellipse creation tools,
@@ -88,18 +100,31 @@ Assets tab (live document colors) (✅ — ADR-015) ·
 CSS-var swap) · `PanelDescriptor` registry · Playwright E2E (+ axe per
 route×theme) · full a11y audit (✅ — ADR-017/018/019). **Phase 6 complete.**
 
+Phase 7 milestones: **M1** undo/redo — operation-sourced history in the
+worker, undoable command surface (✅ — ADR-020) · **M2** file save/load —
+`.graphite` format, `FileGateway` (FS Access API + download fallback),
+quota-guarded autosave (✅ — ADR-021) · **M3** damage model + explicit
+paint order, honest hit-test benches (worst-case miss at 1k/10k/100k),
+Criterion ceilings CI-gated (✅ — ADR-025) · **M4** export — SVG on the
+main thread, PNG/JPEG via off-screen GPU readback, one shared fit-bounds
+rule (✅ — ADR-026) · **M5** scale probe — deterministic 10k/100k stress
+scenes through the product pipeline, palette-only dev-gated `Debug`
+commands (ADR-027; **delivered — the reference-machine capture,
+[benchmarks/phase7-stress.md](./benchmarks/phase7-stress.md), is the
+phase exit gate**).
+
 ## Performance targets
 
-| Subsystem                      | Target                 |
-| ------------------------------ | ---------------------- |
-| Canvas render                  | ≥ 60 fps (≥ 58 on HUD) |
-| Selection response             | < 16 ms                |
-| Document load (medium file)    | < 1 s                  |
-| Collaboration propagation (P9) | < 100 ms               |
-| Hit-test at 10k objects (P7)   | < 1 ms (R-tree)        |
-| Inspector keystroke → frame    | ≤ 2 frames             |
-| Command palette open (M4)      | < 50 ms                |
-| Object budget                  | 10k MVP / 100k system  |
+| Subsystem                      | Target                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Canvas render                  | ≥ 60 fps (≥ 58 on HUD)                                                                                  |
+| Selection response             | < 16 ms                                                                                                 |
+| Document load (medium file)    | < 1 s                                                                                                   |
+| Collaboration propagation (P9) | < 100 ms                                                                                                |
+| Hit-test at 10k objects (P7)   | < 1 ms (linear scan measured 17.7 µs worst-case @10k — ADR-023; R-tree deferred pending the 100k probe) |
+| Inspector keystroke → frame    | ≤ 2 frames                                                                                              |
+| Command palette open (M4)      | < 50 ms                                                                                                 |
+| Object budget                  | 10k MVP / 100k system                                                                                   |
 
 Baselines are recorded per milestone under [`benchmarks/`](./benchmarks/).
 
@@ -150,7 +175,8 @@ runs something else.
 **Routing.** TanStack Router (M5, ADR-017), code-based tree. Shipped: `/`
 editor · `/settings` (lazy). Reserved: `/plugins` (P10) · `/account` (P8) ·
 `/docs/*`. Engine worker + global shortcuts are editor-route-scoped;
-unknown paths redirect to the editor. Main-chunk ceiling 175 kB gzip.
+unknown paths redirect to the editor. Main-chunk ceiling 190 kB gzip
+(recalibrated from 175 kB — ADR-024).
 
 **File organization.** Feature folders adopted M3 (`features/tools`,
 `features/layers`, `features/inspector`); `contexts/` renamed from
@@ -158,7 +184,11 @@ unknown paths redirect to the editor. Main-chunk ceiling 175 kB gzip.
 `features/shortcuts`, `features/palette`, `features/assets`, and
 `layouts/LeftPanel` — the Layers|Assets tab host that M5's PanelDescriptor
 registry will absorb as its first docking site. More folders (`providers/`, `routes/`)
-materialise with their first M5 occupant. ~250-line file budget, unchanged.
+materialise with their first M5 occupant. Phase 7 adds `features/files`
+(ADR-021), `features/export` (ADR-026), the worker's `engine/history.ts`
+and the `scene/{create,mutate,remove,apply,stress}` splits, and the first
+dev-only surface (`commands/builtin/debugCommands.ts`, ADR-027).
+~250-line file budget, unchanged.
 
 **Accessibility.** Keyboard-first: every interactive element reachable and
 operable (the Layers tree is the accessible representation of the canvas —
