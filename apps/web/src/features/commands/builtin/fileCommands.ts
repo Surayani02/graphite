@@ -61,16 +61,17 @@ export const fileCommands: readonly CommandDescriptor[] = [
     },
   },
   {
-    id: "export.svg",
-    title: "Export as SVG",
+    id: "file.export",
+    title: "Export\u2026",
     category: "File",
     // No default chord: mod+e is browser-contested (Chromium search-mode)
     // and mod+shift+e is extension-squatted — palette + custom remap only,
-    // same policy as file.new.
-    keywords: ["export", "svg", "vector", "image", "download"],
+    // same policy as file.new. Opens the export dialog; format/scale/quality
+    // and the actual serialize-or-readback happen on confirm.
+    keywords: ["export", "svg", "png", "jpeg", "jpg", "vector", "image", "download"],
     enabled: (ctx) => ctx.engine.status === "running" && ctx.engine.hasContent,
     run: (ctx) => {
-      ctx.exports.svg();
+      ctx.exports.open();
     },
   },
 ];

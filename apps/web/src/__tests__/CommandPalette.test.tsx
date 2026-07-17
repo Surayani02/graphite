@@ -4,6 +4,7 @@ import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EngineContext } from "../contexts/EngineContext";
 import { FilesContext, type FilesContextValue } from "../features/files/FilesProvider";
+import { ExportProvider } from "../features/export/useExport";
 import { ensureBuiltinCommands } from "../features/commands/builtin";
 import { createCommandRegistry } from "../features/commands/registry";
 import { CommandPalette } from "../features/palette/CommandPalette";
@@ -60,6 +61,7 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     newDocument: vi.fn(),
     getDocumentJson: vi.fn(() => Promise.resolve("{}")),
     markSaved: vi.fn(),
+    exportRaster: vi.fn(() => Promise.resolve(new Uint8Array())),
     nodes: NODES,
     setSelection: vi.fn(),
     updateNode: vi.fn(),
@@ -100,7 +102,9 @@ function renderPalette(
   return render(
     <EngineContext.Provider value={engine}>
       <FilesContext.Provider value={files}>
-        <CommandPalette registry={registry} />
+        <ExportProvider>
+          <CommandPalette registry={registry} />
+        </ExportProvider>
       </FilesContext.Provider>
     </EngineContext.Provider>
   );

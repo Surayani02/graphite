@@ -50,7 +50,9 @@ export interface CommandContext {
   /** Export actions (Phase 7 M4) — fire-and-forget like `files.*`;
    *  serialization and the gateway handoff live in `features/export`. */
   readonly exports: {
-    readonly svg: () => void;
+    /** Opens the export dialog (Phase 7 M4) — format/scale/quality choice
+     *  lives there; the actual serialize/readback runs on confirm. */
+    readonly open: () => void;
   };
   readonly ui: {
     readonly setActiveTool: (tool: ToolType) => void;

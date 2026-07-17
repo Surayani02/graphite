@@ -23,4 +23,16 @@ test.describe("export (Phase 7 M4)", () => {
     await page.getByRole("searchbox").fill("export");
     await expect(page.getByRole("option", { name: /Export/ })).toHaveCount(0);
   });
+
+  test("the export command is discoverable by format keywords but stays gated", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await waitForShell(page);
+    await openPalette(page);
+    // "png"/"jpeg" are keywords on the single export command; with the engine
+    // down and no content it must not surface regardless of search term.
+    await page.getByRole("searchbox").fill("png");
+    await expect(page.getByRole("option", { name: /Export/ })).toHaveCount(0);
+  });
 });

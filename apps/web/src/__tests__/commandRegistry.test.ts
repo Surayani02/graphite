@@ -28,7 +28,7 @@ function fakeContext(selectedIds: readonly string[] = []): CommandContext {
       newDocument: vi.fn(),
     },
     exports: {
-      svg: vi.fn(),
+      open: vi.fn(),
     },
     ui: {
       setActiveTool: vi.fn(),

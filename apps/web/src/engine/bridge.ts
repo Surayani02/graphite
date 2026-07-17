@@ -31,6 +31,8 @@ import type {
   HistoryStatus,
   NodeId,
   NodePatch,
+  RasterFormat,
+  Color,
 } from "@graphite/protocol";
 import { FpsTracker } from "./fps";
 
@@ -70,6 +72,13 @@ export class EngineWorkerBridge {
   private readonly handlers: Partial<EngineBridgeEvents> = {};
   private initialized = false;
   private readonly fps = new FpsTracker();
+  // Phase 7 M4b: raster export is request->result/error correlated by id. A
+  // promise map fits better than the event surface -- the caller awaits bytes.
+  private readonly pendingExports = new Map<
+    string,
+    { resolve: (bytes: Uint8Array) => void; reject: (err: Error) => void }
+  >();
+  private exportSeq = 0;
 
   constructor() {
     this.worker = new Worker(new URL("../workers/engine.worker.ts", import.meta.url), {
@@ -163,6 +172,31 @@ export class EngineWorkerBridge {
    *  clears the worker-side dirty flag. Call only after the write succeeded. */
   markSaved(): void {
     this.worker.postMessage({ type: "document:mark_saved" } satisfies MainToEngineMessage);
+  }
+
+  /** Requests an off-screen raster export (Phase 7 M4b). Resolves with the
+   *  encoded PNG/JPEG bytes, or rejects if the worker reports export:error.
+   *  Each call gets a fresh correlation id so a slow export finishing after
+   *  a newer one starts still settles its own promise. */
+  exportRaster(
+    format: RasterFormat,
+    scale: number,
+    quality: number,
+    background: Color
+  ): Promise<Uint8Array> {
+    this.exportSeq += 1;
+    const requestId = `export-${String(this.exportSeq)}`;
+    return new Promise<Uint8Array>((resolve, reject) => {
+      this.pendingExports.set(requestId, { resolve, reject });
+      this.worker.postMessage({
+        type: "export:raster:request",
+        requestId,
+        format,
+        scale,
+        quality,
+        background,
+      } satisfies MainToEngineMessage);
+    });
   }
 
   // ── Interaction (Phase 4) ─────────────────────────────────────────────────
@@ -295,6 +329,22 @@ export class EngineWorkerBridge {
       }
       case "document:state": {
         this.handlers.onDocumentState?.(msg.json, msg.requestId ?? null);
+        break;
+      }
+      case "export:raster:result": {
+        const pending = this.pendingExports.get(msg.requestId);
+        if (pending) {
+          this.pendingExports.delete(msg.requestId);
+          pending.resolve(msg.bytes);
+        }
+        break;
+      }
+      case "export:error": {
+        const pending = this.pendingExports.get(msg.requestId);
+        if (pending) {
+          this.pendingExports.delete(msg.requestId);
+          pending.reject(new Error(msg.message));
+        }
         break;
       }
       case "document:nodes": {

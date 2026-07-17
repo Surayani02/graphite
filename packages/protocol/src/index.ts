@@ -47,6 +47,12 @@ export const TOOL_TYPES = {
 
 export type ToolType = (typeof TOOL_TYPES)[keyof typeof TOOL_TYPES];
 
+// ─── Raster export (Phase 7 M4) ─────────────────────────────────────────────
+/** The two raster formats the worker can encode via `convertToBlob`. SVG is
+ *  a pure main-thread path (no engine involvement) and deliberately absent. */
+export const RASTER_FORMATS = { PNG: "png", JPEG: "jpeg" } as const;
+export type RasterFormat = (typeof RASTER_FORMATS)[keyof typeof RASTER_FORMATS];
+
 // ─── Color ────────────────────────────────────────────────────────────────────
 
 /**
@@ -267,6 +273,23 @@ export type EngineToMainMessage =
     }
   // ── Phase 5 ─────────────────────────────────────────────────────────────────
   | {
+      readonly type: "export:raster:result";
+      readonly requestId: string;
+      readonly format: RasterFormat;
+      /** Encoded image bytes (PNG or JPEG file contents), transferred — not
+       *  copied — across the worker boundary. */
+      readonly bytes: Uint8Array;
+    }
+  // ── Phase 7 Milestone 4 ─────────────────────────────────────────────────────
+  | {
+      /** Export failed in the worker (empty document, GPU readback error,
+       *  or encode failure). Carries the correlation id so the awaiting
+       *  main-thread request settles instead of hanging. */
+      readonly type: "export:error";
+      readonly requestId: string;
+      readonly message: string;
+    }
+  | {
       readonly type: "document:state";
       /** Complete document serialised as JSON. Always written to the
        *  localStorage recovery snapshot by the main thread; when
@@ -374,6 +397,23 @@ export type MainToEngineMessage =
        *  no longer marks the history saved; see document:mark_saved. */
       readonly type: "document:request_save";
       readonly requestId?: string | undefined;
+    }
+  // ── Phase 7 Milestone 4 ─────────────────────────────────────────────────────
+  | {
+      /** Rasterise the whole document off-screen and return encoded bytes
+       *  (ADR-026). The worker fits an export camera to content, renders
+       *  into an owned texture at `scale` device-pixels per world unit,
+       *  reads it back, and encodes to `format`. Correlated by `requestId`
+       *  exactly like document:request_save, so a slow export can never be
+       *  mismatched to a later one. `quality` (0..1) applies to JPEG only;
+       *  `background` flattens transparency (JPEG has no alpha channel) and
+       *  is ignored for PNG, which keeps it. */
+      readonly type: "export:raster:request";
+      readonly requestId: string;
+      readonly format: RasterFormat;
+      readonly scale: number;
+      readonly quality: number;
+      readonly background: Color;
     }
   // ── Phase 6 Milestone 2 ─────────────────────────────────────────────────────
   | {

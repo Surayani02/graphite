@@ -35,7 +35,7 @@ function fakeContext(
       newDocument: vi.fn(),
     },
     exports: {
-      svg: vi.fn(),
+      open: vi.fn(),
     },
     ui: {
       setActiveTool: vi.fn(),
@@ -206,28 +206,28 @@ describe("file commands", () => {
 
 // ─── Phase 7 Milestone 4 — export ────────────────────────────────────────────
 
-describe("export.svg (Phase 7 M4)", () => {
-  it("routes to the export capability when running with content", () => {
+describe("export (Phase 7 M4)", () => {
+  it("opens the export dialog when running with content", () => {
     const registry = createCommandRegistry();
     ensureBuiltinCommands(registry);
     const ctx = fakeContext();
-    expect(registry.execute("export.svg", ctx)).toBe(true);
-    expect(ctx.exports.svg).toHaveBeenCalledTimes(1);
+    expect(registry.execute("file.export", ctx)).toBe(true);
+    expect(ctx.exports.open).toHaveBeenCalledTimes(1);
   });
 
   it("is gated out while the engine is down — same contract as every file command", () => {
     const registry = createCommandRegistry();
     ensureBuiltinCommands(registry);
     const ctx = fakeContext([], {}, "error");
-    expect(registry.execute("export.svg", ctx)).toBe(false);
-    expect(ctx.exports.svg).not.toHaveBeenCalled();
+    expect(registry.execute("file.export", ctx)).toBe(false);
+    expect(ctx.exports.open).not.toHaveBeenCalled();
   });
 
-  it("is gated out for an empty document — nothing to serialise beats an empty file", () => {
+  it("is gated out for an empty document — nothing to export beats an empty file", () => {
     const registry = createCommandRegistry();
     ensureBuiltinCommands(registry);
     const ctx = fakeContext([], {}, "running", false);
-    expect(registry.execute("export.svg", ctx)).toBe(false);
-    expect(ctx.exports.svg).not.toHaveBeenCalled();
+    expect(registry.execute("file.export", ctx)).toBe(false);
+    expect(ctx.exports.open).not.toHaveBeenCalled();
   });
 });

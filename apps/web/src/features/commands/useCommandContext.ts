@@ -24,7 +24,7 @@ export function useCommandContext(): CommandContext {
     redo,
   } = useEngineContext();
   const { save, saveAs, open, newDocument } = useFiles();
-  const { hasContent, exportSvg } = useExport();
+  const { hasContent, openDialog } = useExport();
   const setActiveTool = useUIStore((s) => s.setActiveTool);
   const toggleLayers = useUIStore((s) => s.toggleLayers);
   const toggleInspector = useUIStore((s) => s.toggleInspector);
@@ -46,7 +46,7 @@ export function useCommandContext(): CommandContext {
         redo,
       },
       files: { save, saveAs, open, newDocument },
-      exports: { svg: exportSvg },
+      exports: { open: openDialog },
       ui: {
         setActiveTool,
         toggleLeftPanel: toggleLayers,
@@ -76,7 +76,7 @@ export function useCommandContext(): CommandContext {
       setLeftPanelTab,
       openShortcutRecorder,
       hasContent,
-      exportSvg,
+      openDialog,
     ]
   );
 }

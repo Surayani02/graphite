@@ -28,6 +28,7 @@ import {
   uploadRenderList,
 } from "./engine/gpu/buffers";
 import { startRenderLoop } from "./engine/gpu/render";
+import { exportRaster } from "./engine/gpu/export";
 import { buildDemoScene } from "./engine/scene/demo";
 import { rebuildSceneFromDocument } from "./engine/scene/rebuild";
 import { postDocumentNodes } from "./engine/scene/mutate";
@@ -143,6 +144,33 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
       // in M2: the main thread may be about to show a save picker the user
       // cancels, and a cancelled save must leave the document dirty.
       postDocumentState(msg.requestId);
+      break;
+    }
+
+    case "export:raster:request": {
+      // Async GPU readback: render off-screen, encode, transfer bytes back.
+      // Any failure (empty doc, readback, encode) is reported as
+      // export:error against the same requestId so the awaiting main-thread
+      // promise settles rather than hanging.
+      void exportRaster(state, msg.format, msg.scale, msg.quality, msg.background)
+        .then((bytes) => {
+          post(
+            {
+              type: "export:raster:result",
+              requestId: msg.requestId,
+              format: msg.format,
+              bytes,
+            },
+            [bytes.buffer]
+          );
+        })
+        .catch((err: unknown) => {
+          post({
+            type: "export:error",
+            requestId: msg.requestId,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        });
       break;
     }
 

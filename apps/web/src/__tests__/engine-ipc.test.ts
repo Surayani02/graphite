@@ -458,3 +458,40 @@ describe("frame:idle (Phase 7 M3)", () => {
     expect(Object.keys(msg)).toHaveLength(1);
   });
 });
+
+// ─── Raster export (Phase 7 M4b) ─────────────────────────────────────────────
+
+describe("export raster messages (Phase 7 M4b)", () => {
+  it("request carries format, scale, quality, background, and a correlation id", () => {
+    const msg: MainToEngineMessage = {
+      type: "export:raster:request",
+      requestId: "export-1",
+      format: "png",
+      scale: 2,
+      quality: 0.92,
+      background: { r: 255, g: 255, b: 255, a: 255 },
+    };
+    expect(msg.format).toBe("png");
+    expect(msg.scale).toBe(2);
+  });
+
+  it("result echoes the id and carries transferable bytes", () => {
+    const msg: EngineToMainMessage = {
+      type: "export:raster:result",
+      requestId: "export-1",
+      format: "jpeg",
+      bytes: new Uint8Array([0xff, 0xd8]),
+    };
+    expect(msg.bytes).toBeInstanceOf(Uint8Array);
+    expect(msg.requestId).toBe("export-1");
+  });
+
+  it("error carries the id so the awaiting request can settle", () => {
+    const msg: EngineToMainMessage = {
+      type: "export:error",
+      requestId: "export-1",
+      message: "Nothing to export",
+    };
+    expect(msg.message).toContain("Nothing");
+  });
+});

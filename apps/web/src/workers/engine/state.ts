@@ -60,6 +60,10 @@ export interface EngineState {
   gpuDevice: GPUDevice | null;
   gpuContext: GPUCanvasContext | null;
   gpuPipeline: GPURenderPipeline | null;
+  /** rgba8unorm-targeted pipeline for raster export, built lazily on first
+   *  export and cached (Phase 7 M4b) — the live pipeline targets the
+   *  swap-chain's bgra8 format, unsuitable for a copyable export texture. */
+  exportPipeline: GPURenderPipeline | null;
   cameraBuffer: GPUBuffer | null;
   shapeBuffer: GPUBuffer | null;
   selectionBuffer: GPUBuffer | null;
@@ -129,6 +133,7 @@ export function createInitialState(): EngineState {
     gpuDevice: null,
     gpuContext: null,
     gpuPipeline: null,
+    exportPipeline: null,
     cameraBuffer: null,
     shapeBuffer: null,
     selectionBuffer: null,

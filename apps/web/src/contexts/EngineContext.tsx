@@ -69,6 +69,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       stable.newDocument,
       stable.getDocumentJson,
       stable.markSaved,
+      stable.exportRaster,
     ]
   );
 

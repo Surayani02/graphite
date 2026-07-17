@@ -8,6 +8,8 @@ import type {
   DocNode,
   HistoryStatus,
   NodePatch,
+  RasterFormat,
+  Color,
 } from "@graphite/protocol";
 import { DEFAULT_CAMERA } from "@graphite/protocol";
 
@@ -72,6 +74,14 @@ export interface UseEngineResult {
   getDocumentJson: () => Promise<string>;
   /** Confirms a durable write — clears the worker's dirty flag. */
   markSaved: () => void;
+  /** Off-screen raster export (Phase 7 M4b) — resolves with encoded
+   *  PNG/JPEG bytes, rejects if the worker reports an export failure. */
+  exportRaster: (
+    format: RasterFormat,
+    scale: number,
+    quality: number,
+    background: Color
+  ) => Promise<Uint8Array>;
   // History (Phase 7 Milestone 1)
   /** Undo/redo availability — drives command enablement and (later, M2)
    *  the unsaved-changes indicator. Mirrors the worker's history:state. */
@@ -284,6 +294,21 @@ export function useEngine(): UseEngineResult {
   const markSaved = useCallback(() => {
     bridgeRef.current?.markSaved();
   }, []);
+  const exportRaster = useCallback(
+    (
+      format: RasterFormat,
+      scale: number,
+      quality: number,
+      background: Color
+    ): Promise<Uint8Array> => {
+      const bridge = bridgeRef.current;
+      if (bridge === null) {
+        return Promise.reject(new Error("Engine worker is not running"));
+      }
+      return bridge.exportRaster(format, scale, quality, background);
+    },
+    []
+  );
 
   return {
     initEngine,
@@ -313,5 +338,6 @@ export function useEngine(): UseEngineResult {
     newDocument,
     getDocumentJson,
     markSaved,
+    exportRaster,
   };
 }

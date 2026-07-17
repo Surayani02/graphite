@@ -6,6 +6,8 @@ import { ToolsRail } from "../features/tools/ToolsRail";
 import { EngineCanvas } from "../components/EngineCanvas";
 import { ensureBuiltinCommands } from "../features/commands/builtin";
 import { CommandPalette } from "../features/palette/CommandPalette";
+import { ExportProvider } from "../features/export/useExport";
+import { ExportDialogHost } from "../features/export/ExportDialogHost";
 import { ShortcutProvider } from "../features/shortcuts/ShortcutProvider";
 import { ShortcutRecorderDialog } from "../features/shortcuts/ShortcutRecorderDialog";
 import { ensureBuiltinPanels } from "../features/panels/builtinPanels";
@@ -34,20 +36,23 @@ export function AppShell() {
   return (
     <EngineProvider>
       <FilesProvider>
-        <ShortcutProvider>
-          <div className="grid h-screen grid-rows-[auto_1fr_auto] bg-surface-canvas text-content-primary">
-            <TopToolbar />
-            <div className="grid grid-cols-[auto_auto_1fr_auto] overflow-hidden">
-              <ToolsRail />
-              <PanelAreaSlot area="left" />
-              <EngineCanvas />
-              <PanelAreaSlot area="right" />
+        <ExportProvider>
+          <ShortcutProvider>
+            <div className="grid h-screen grid-rows-[auto_1fr_auto] bg-surface-canvas text-content-primary">
+              <TopToolbar />
+              <div className="grid grid-cols-[auto_auto_1fr_auto] overflow-hidden">
+                <ToolsRail />
+                <PanelAreaSlot area="left" />
+                <EngineCanvas />
+                <PanelAreaSlot area="right" />
+              </div>
+              <StatusBar />
             </div>
-            <StatusBar />
-          </div>
-          <CommandPalette />
-          <ShortcutRecorderDialog />
-        </ShortcutProvider>
+            <CommandPalette />
+            <ShortcutRecorderDialog />
+            <ExportDialogHost />
+          </ShortcutProvider>
+        </ExportProvider>
       </FilesProvider>
     </EngineProvider>
   );
