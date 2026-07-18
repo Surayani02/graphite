@@ -126,7 +126,7 @@ export function EngineCanvas() {
   ];
 
   return (
-    <div role="region" aria-label="Graphite canvas" className="relative h-full w-full">
+    <div role="region" aria-label="Graphite canvas" className="relative h-full min-h-0 w-full">
       <canvas
         ref={canvasRef}
         className="block h-full w-full"

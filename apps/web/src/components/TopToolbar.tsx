@@ -1,6 +1,10 @@
+import { Link } from "@tanstack/react-router";
+import { Settings } from "lucide-react";
+import { Tooltip } from "@graphite/ui-core";
 import { useEngineContext } from "../contexts/EngineContext";
 import { useFiles } from "../features/files/FilesProvider";
 import { useCommandShortcut } from "../features/shortcuts/useResolvedShortcuts";
+import { ThemeToggle } from "../features/theme/ThemeToggle";
 
 /**
  * Top toolbar — Phase 6 M1, slimmed to document-level actions in M3,
@@ -40,6 +44,20 @@ export function TopToolbar() {
       )}
 
       <div className="flex-1" />
+
+      <ThemeToggle />
+
+      <Tooltip label="Settings">
+        <Link
+          to="/settings"
+          aria-label="Settings"
+          className="flex h-7 w-7 items-center justify-center rounded text-content-tertiary hover:bg-surface-panel-hover hover:text-content-secondary focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-border-focus"
+        >
+          <Settings size={15} aria-hidden />
+        </Link>
+      </Tooltip>
+
+      <div className="mx-1 h-5 w-px bg-border-subtle" aria-hidden />
 
       <button
         type="button"

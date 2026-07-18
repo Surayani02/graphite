@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { COLOR_TRANSPARENT, type NodePatch } from "@graphite/protocol";
 import { useUIStore } from "../../stores/uiStore";
 import { useEngineContext } from "../../contexts/EngineContext";
@@ -33,18 +34,23 @@ export function InspectorPanel() {
   return (
     <aside
       aria-label="Inspector"
-      className={`flex flex-col border-l border-border-subtle bg-surface-panel transition-[width] ${
+      className={`flex min-h-0 flex-col overflow-hidden border-l border-border-subtle bg-surface-panel transition-[width] duration-200 ease-out ${
         inspectorOpen ? "w-64" : "w-9"
       }`}
     >
-      <div className="flex h-9 items-center justify-between border-b border-border-subtle px-2">
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border-subtle px-2">
         <button
           type="button"
           title={inspectorOpen ? "Collapse inspector" : "Expand inspector"}
+          aria-label={inspectorOpen ? "Collapse inspector" : "Expand inspector"}
           onClick={toggleInspector}
-          className="mr-auto rounded px-1.5 py-0.5 text-content-tertiary hover:bg-surface-panel-hover"
+          className="flex h-6 w-6 items-center justify-center rounded text-content-tertiary hover:bg-surface-panel-hover hover:text-content-secondary"
         >
-          {inspectorOpen ? "›" : "‹"}
+          {inspectorOpen ? (
+            <PanelRightClose size={15} aria-hidden />
+          ) : (
+            <PanelRightOpen size={15} aria-hidden />
+          )}
         </button>
         {inspectorOpen && (
           <span className="font-mono text-[11px] uppercase tracking-wide text-content-tertiary">
@@ -54,7 +60,7 @@ export function InspectorPanel() {
       </div>
 
       {inspectorOpen && (
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto p-2">
           {!node ? (
             <p className="font-mono text-[11px] text-content-tertiary">
               {selectedIds.length > 0 ? "Loading…" : "Select a shape to inspect it."}

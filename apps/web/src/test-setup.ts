@@ -13,3 +13,24 @@ import "@testing-library/jest-dom/vitest";
 if (typeof Element !== "undefined" && typeof Element.prototype.scrollIntoView !== "function") {
   Element.prototype.scrollIntoView = () => {};
 }
+
+// jsdom does not implement `matchMedia`. Components that feature-detect it
+// (useApplyTheme, ThemeToggle) short-circuit when it's absent, but any test
+// that renders them through the real shell wants a working default rather
+// than the theme system silently disabled — a matchMedia-less environment
+// isn't representative of any real browser. Provide a benign default
+// (nothing matches, listeners are inert); individual tests that need a
+// specific match state still override with vi.stubGlobal.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  window.matchMedia = (query: string): MediaQueryList =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}

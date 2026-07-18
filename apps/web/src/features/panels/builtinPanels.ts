@@ -6,11 +6,13 @@ const registered = new WeakSet<PanelRegistry>();
 
 /**
  * The built-in panels (M5). LeftPanel (Layers|Assets) and InspectorPanel
- * become the first descriptors — visibility bound to the existing persisted
- * store flags, so this is pure indirection with zero behaviour change.
- * LeftPanel already renders its own collapsed rail via `layersOpen`, so it
- * is always present (`isVisible: true`) and owns its width internally;
- * the inspector is shown/hidden wholesale by `inspectorOpen`.
+ * are the first descriptors. Both own their collapsed rail internally and
+ * are therefore **always present** (`isVisible: true`) — the rail is how a
+ * collapsed panel offers its own re-expand control. Binding inspector
+ * visibility to `inspectorOpen` was BUG-08: it removed the whole panel,
+ * collapsed rail included, so a collapsed inspector had no way back. Width
+ * (full vs w-9 rail) is each panel's own internal concern, driven by the
+ * store flag; presence is not.
  *
  * Idempotent per registry, like ensureBuiltinCommands — safe under HMR and
  * repeated test setup.
@@ -32,6 +34,6 @@ export function ensureBuiltinPanels(registry: PanelRegistry = panelRegistry): vo
     area: "right",
     order: 0,
     component: InspectorPanel,
-    isVisible: (state) => state.inspectorOpen,
+    isVisible: () => true,
   });
 }

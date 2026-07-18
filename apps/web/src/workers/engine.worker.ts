@@ -20,7 +20,12 @@ import type { MainToEngineMessage } from "@graphite/protocol";
 import { DocumentModel } from "../document/model";
 import { createInitialState } from "./engine/state";
 import { post, toErrorMsg } from "./engine/messaging";
-import { configureContext, initWebGPU } from "./engine/gpu/context";
+import {
+  DEFAULT_MAX_TEXTURE_DIM,
+  clampCanvasSize,
+  configureContext,
+  initWebGPU,
+} from "./engine/gpu/context";
 import {
   rebuildMainBindGroup,
   rebuildSelectionBindGroup,
@@ -48,6 +53,11 @@ import { deleteSelection } from "./engine/scene/remove";
 import { markSceneDirty } from "./engine/state";
 
 const state = createInitialState();
+
+// M5-FR1: one warning per worker lifetime — a clamped resize repeats on
+// every observer tick while the layout bug persists; the first is signal,
+// the rest are noise.
+let resizeClampWarned = false;
 
 /** Serialises the current document and posts it, if one exists. Used by
  * document:new / document:load / document:request_save — all three end
@@ -94,12 +104,29 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
 
     case "engine:resize": {
       markSceneDirty(state); // viewport change moves the cull frustum
-      state.vpW = msg.width;
-      state.vpH = msg.height;
+      // M5-FR1: never configure a swap-chain the device cannot allocate.
+      // The AppShell containment fix removes the layout path that produced
+      // a 300k-px canvas; this guard turns any future layout regression
+      // into a clamped-but-alive canvas (visually stretched, loudly
+      // warned) instead of a dead pipeline spamming validation errors.
+      // vpW/vpH take the clamped values too — camera NDC math and the
+      // backing store must agree.
+      const maxDim = state.gpuDevice?.limits.maxTextureDimension2D ?? DEFAULT_MAX_TEXTURE_DIM;
+      const size = clampCanvasSize(msg.width, msg.height, maxDim);
+      if (size.clamped && !resizeClampWarned) {
+        resizeClampWarned = true;
+        console.warn(
+          `[graphite] engine:resize ${String(msg.width)}×${String(msg.height)} is outside ` +
+            `the device's allocatable range (max ${String(maxDim)} px) — clamped to ` +
+            `${String(size.width)}×${String(size.height)}. This indicates a shell layout bug.`
+        );
+      }
+      state.vpW = size.width;
+      state.vpH = size.height;
       state.dpr = msg.devicePixelRatio;
       if (state.gpuCanvas) {
-        state.gpuCanvas.width = msg.width;
-        state.gpuCanvas.height = msg.height;
+        state.gpuCanvas.width = size.width;
+        state.gpuCanvas.height = size.height;
         configureContext(state);
       }
       break;

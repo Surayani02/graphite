@@ -40,7 +40,15 @@ export function AppShell() {
           <ShortcutProvider>
             <div className="grid h-screen grid-rows-[auto_1fr_auto] bg-surface-canvas text-content-primary">
               <TopToolbar />
-              <div className="grid grid-cols-[auto_auto_1fr_auto] overflow-hidden">
+              {/* grid-rows-[minmax(0,1fr)]: the single row is definite —
+                  exactly the 1fr track height — so a panel whose *content*
+                  is taller than the window (10k Layers rows) scrolls inside
+                  its own overflow chain instead of inflating the implicit
+                  auto row and stretching every sibling with it, canvas
+                  included (M5-FR1: a 240,044-px-tall row resized the
+                  swap-chain past the GPU's 8,192-px texture limit and
+                  killed every frame). */}
+              <div className="grid grid-cols-[auto_auto_1fr_auto] grid-rows-[minmax(0,1fr)] overflow-hidden">
                 <ToolsRail />
                 <PanelAreaSlot area="left" />
                 <EngineCanvas />

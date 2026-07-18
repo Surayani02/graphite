@@ -29,6 +29,23 @@
  */
 @import "../../../../packages/ui-core/src/tokens.css";
 
+/*
+ * scrollbar-none — scroll without a visible scrollbar. Panels (Layers,
+ * Assets, Inspector) stay scrollable at any content length but show no
+ * track, matching the design brief's chromeless panels. Implemented as a
+ * v4 `@utility` so it composes like any Tailwind class; covers Firefox
+ * (`scrollbar-width`), legacy IE/Edge (`-ms-overflow-style`), and
+ * WebKit/Blink (`::-webkit-scrollbar`). Scrolling by wheel, trackpad,
+ * keyboard, and touch is unaffected — only the visual track is removed.
+ */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 html,
 body,
 #root {

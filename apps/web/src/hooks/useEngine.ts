@@ -18,6 +18,18 @@ import { DEFAULT_CAMERA } from "@graphite/protocol";
 /** localStorage key.  Versioned to allow future format migrations. */
 const STORAGE_KEY = "graphite-document-v1";
 
+/**
+ * A worker-initiated tool change, modelled as an *event*. The `seq`
+ * increments on every emission, so two consecutive changes to the *same*
+ * tool ("select" → draw → "select" → draw) still register as distinct
+ * signals — which is exactly what the sync hook needs to avoid mistaking a
+ * stale value for the absence of a new one (BUG-07).
+ */
+export interface EngineToolSignal {
+  readonly tool: ToolType;
+  readonly seq: number;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type EngineStatus = "idle" | "initializing" | "running" | "error";
@@ -54,11 +66,15 @@ export interface UseEngineResult {
   setSelection: (nodeIds: readonly string[]) => void;
   updateNode: (nodeId: string, patch: NodePatch) => void;
   // Tools & deletion (Phase 6 Milestone 3)
-  /** Worker-initiated tool change (e.g. auto-return to "select" after a
-   *  shape commits) — read by useSyncToolWithEngine to keep the Zustand
-   *  store in sync with a decision the engine made, not the user. `null`
-   *  until the first such change occurs this session. */
-  lastEngineTool: ToolType | null;
+  /** One-shot signal that the *worker* changed the active tool on its own
+   *  (e.g. auto-return to "select" after a shape-creation drag commits).
+   *  An **event, not a state**: it carries the tool plus a monotonically
+   *  increasing `seq`, so useSyncToolWithEngine can distinguish a genuinely
+   *  new engine change from a stale repeat of the same tool value. `null`
+   *  until the first such change this session. The previous sticky-state
+   *  form let a stale "select" masquerade as a fresh engine command and
+   *  silently override the user's next tool pick (BUG-07). */
+  lastEngineTool: EngineToolSignal | null;
   deleteSelection: () => void;
   // Files (Phase 7 Milestone 2)
   /** Loads a bare DocumentData JSON string into the worker (replaces the
@@ -125,7 +141,7 @@ export function useEngine(): UseEngineResult {
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [nodes, setNodes] = useState<readonly DocNode[]>([]);
-  const [lastEngineTool, setLastEngineTool] = useState<ToolType | null>(null);
+  const [lastEngineTool, setLastEngineTool] = useState<EngineToolSignal | null>(null);
   const [historyStatus, setHistoryStatus] = useState<HistoryStatus>(DEFAULT_HISTORY_STATUS);
   const [historyAnnouncement, setHistoryAnnouncement] = useState<string | null>(null);
 
@@ -211,7 +227,9 @@ export function useEngine(): UseEngineResult {
         setNodes(n);
       })
       .on("onToolChanged", (tool) => {
-        setLastEngineTool(tool);
+        // Event, not state: bump seq every time so an identical tool value
+        // arriving twice still counts as two distinct signals (BUG-07).
+        setLastEngineTool((prev) => ({ tool, seq: (prev?.seq ?? 0) + 1 }));
       })
       .on("onHistoryStatus", (status, announce) => {
         setHistoryStatus(status);

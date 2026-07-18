@@ -99,7 +99,10 @@ Run the full set at **10k first**, record, then repeat at **100k**.
    virtualized, a known edge), palette responsiveness while typing a
    node-name query (node search scores every non-frame node per
    keystroke), and main-thread jank when the `document:nodes` broadcast
-   lands.
+   lands. Also confirm the M5-FR1 regression check: with the **Layers tab
+   active** at both scales, the canvas keeps rendering and the console
+   shows no Dawn texture-size errors — the shell's containment fix holds
+   and the panel scrolls inside its own chain.
 
 ## Results — 10k (MVP budget)
 

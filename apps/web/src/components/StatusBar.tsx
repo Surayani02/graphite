@@ -28,9 +28,20 @@ export function StatusBar() {
         <>
           {stats.idle ? (
             // Damage model parked the loop — zero GPU submits right now
-            // (ADR-025). A frozen "60 fps" here would be a lie; a decayed
-            // "0 fps" would look broken. "idle" is what is true.
-            <span>idle</span>
+            // (ADR-025). Not a stall: a dimmed dot + "idle" reads as a
+            // resting state rather than a broken "0 fps", and the title
+            // explains the loop wakes on the next interaction. A frozen
+            // "60 fps" here would be a lie.
+            <span
+              className="flex items-center gap-1.5 text-content-tertiary opacity-70"
+              title="Render loop is idle — paused to save power (ADR-025). It resumes automatically on the next interaction."
+            >
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full bg-content-tertiary"
+                aria-hidden
+              />
+              idle
+            </span>
           ) : (
             <>
               <span>{stats.fps} fps</span>

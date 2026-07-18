@@ -119,7 +119,11 @@ export function LayersPanel() {
   if (tree.length === 0) {
     return (
       <div className="flex h-full flex-col">
-        <div role="region" aria-label="Layer tree" className="flex-1 overflow-y-auto py-1">
+        <div
+          role="region"
+          aria-label="Layer tree"
+          className="scrollbar-none flex-1 overflow-y-auto py-1"
+        >
           <p className="px-2 py-1 font-mono text-[11px] text-content-tertiary">No layers yet.</p>
         </div>
       </div>
@@ -134,7 +138,7 @@ export function LayersPanel() {
         tabIndex={0}
         aria-activedescendant={effectiveActiveId !== null ? rowDomId(effectiveActiveId) : undefined}
         onKeyDown={onTreeKeyDown}
-        className="flex-1 overflow-y-auto py-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/60"
+        className="scrollbar-none flex-1 overflow-y-auto py-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent/60"
       >
         {tree.map((root) => (
           <LayerRow
