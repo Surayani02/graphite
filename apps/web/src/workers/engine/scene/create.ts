@@ -123,6 +123,15 @@ export function commitCreation(state: EngineState, x: number, y: number, shift: 
   state.creation = null;
   state.dragMode = null;
   state.isDragging = false;
+  // Auto-return to select — BUG-07. The worker is the single source of
+  // truth for which tool handles interaction (handlePointerDown reads
+  // state.activeTool), so the auto-return MUST update that state, not only
+  // notify the UI. Emitting tool:changed alone left the worker on
+  // rectangle/ellipse while the toolbar showed select: the next pointer
+  // down started drawing again instead of selecting. Both lines are
+  // required — state.activeTool drives interaction, the message keeps the
+  // React store in sync — and they must agree.
+  state.activeTool = "select";
   post({ type: "tool:changed", tool: "select" });
 }
 

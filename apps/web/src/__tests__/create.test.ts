@@ -44,6 +44,7 @@ function makeState() {
     isDragging: false,
     selectedId: null,
     selectedUuid: null,
+    activeTool: "rectangle" as const,
     history: new History(),
   } as unknown as EngineState;
 
@@ -179,10 +180,15 @@ describe("commitCreation", () => {
     expect(state.selectedId).toBe(engineId);
   });
 
-  it("posts tool:changed to select", () => {
+  it("auto-returns to select — updates worker state AND notifies the UI (BUG-07)", () => {
     const { state } = makeState();
     beginCreation(state, "rectangle", 0, 0);
+    expect(state.activeTool).toBe("rectangle"); // drawing
     commitCreation(state, 100, 100, false);
+    // The worker is the source of truth for interaction: its own activeTool
+    // must flip, or the next pointer down draws again instead of selecting.
+    expect(state.activeTool).toBe("select");
+    // …and the UI must be told, so the toolbar agrees with the worker.
     expect(post).toHaveBeenCalledWith({ type: "tool:changed", tool: "select" });
   });
 
