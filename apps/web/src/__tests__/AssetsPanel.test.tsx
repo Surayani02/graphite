@@ -126,7 +126,7 @@ describe("deriveDocumentColors", () => {
 describe("AssetsPanel", () => {
   it("shows the design-system empty state when the document has no colors", () => {
     renderPanel(mockEngine({ nodes: [] }));
-    expect(screen.getByRole("status")).toHaveTextContent("No document colors");
+    expect(screen.getByRole("status")).toHaveTextContent("No document colours");
   });
 
   it("renders one swatch per color with usage in the title", () => {

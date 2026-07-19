@@ -2,7 +2,7 @@
 
 - **Date:** 2026-07-14
 - **Tree:** `f94d1c5` (Phase 7 M2 merged)
-- **Command:** `cargo bench --all` (Criterion 0.5, `bench` profile, release-optimized)
+- **Command:** `cargo bench --all` (Criterion 0.5, `bench` profile, release-optimised)
 - **Machine:** the reference machine (see README) — deliberately a floor-spec
   environment: if the targets hold here, they hold broadly.
 

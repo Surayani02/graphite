@@ -38,8 +38,8 @@ pnpm build --filter @graphite/engine
 ## Running the project
 
 ```sh
-pnpm dev           # starts the dev server at http://localhost:5173
-                    # (builds @graphite/engine's WASM first, automatically)
+pnpm dev          # starts the dev server at http://localhost:5173
+                  # (builds @graphite/engine's WASM first, automatically)
 ```
 
 ## Before opening a PR

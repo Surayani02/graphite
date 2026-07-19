@@ -29,6 +29,6 @@ describe("fuzzyScore", () => {
     for (let i = 0; i < 10_000; i += 1) {
       acc += fuzzyScore(QUERIES[i % QUERIES.length] ?? "", TARGETS[i % TARGETS.length] ?? "");
     }
-    if (acc < 0) throw new Error("unreachable — keeps the loop from being optimized away");
+    if (acc < 0) throw new Error("unreachable — keeps the loop from being optimised away");
   });
 });

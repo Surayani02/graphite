@@ -42,7 +42,7 @@ export function deriveDocumentColors(nodes: readonly DocNode[]): readonly Docume
   }));
 }
 
-/** Live document colors — Assets v1's single asset class (Blueprint M4). */
+/** Live document colours — Assets v1's single asset class (Blueprint M4). */
 export function useDocumentColors(): readonly DocumentColor[] {
   const { nodes } = useEngineContext();
   return useMemo(() => deriveDocumentColors(nodes), [nodes]);

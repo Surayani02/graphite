@@ -37,7 +37,7 @@ macOS, Ctrl elsewhere) so overrides persist portably across a user's
 machines; the secondary modifier keeps its literal name. Keys come from the
 layout-aware `e.key` — documented limitation: shifted symbols bind as the
 produced character. Display formatting follows platform convention
-(HIG-ordered symbols on mac, `Ctrl+Shift+K` elsewhere) and every surface
+(HIG-ordered symbols on Mac, `Ctrl+Shift+K` elsewhere) and every surface
 also mirrors the live chord as `aria-keyshortcuts`.
 
 **4. Resolution and collision policy** (`shortcutMap.ts`). An override

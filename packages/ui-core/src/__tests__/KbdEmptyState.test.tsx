@@ -14,9 +14,9 @@ describe("Kbd", () => {
 
 describe("EmptyState", () => {
   it("renders title, optional description, and a status role", () => {
-    render(<EmptyState title="No document colors" description="Draw a shape to get started." />);
+    render(<EmptyState title="No document colours" description="Draw a shape to get started." />);
     const region = screen.getByRole("status");
-    expect(region).toHaveTextContent("No document colors");
+    expect(region).toHaveTextContent("No document colours");
     expect(region).toHaveTextContent("Draw a shape to get started.");
   });
 

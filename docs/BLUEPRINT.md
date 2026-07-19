@@ -95,7 +95,7 @@ lucide-react icons, Floating UI context menus/tooltips, leaf-shape
 deletion (✅) ·
 **M4** command registry + palette (mod+K, layer search), remappable
 shortcut registry with in-product recorder, tabbed left panel with an
-Assets tab (live document colors) (✅ — ADR-015) ·
+Assets tab (live document colours) (✅ — ADR-015) ·
 **M5** TanStack Router (`/settings`, lazy) · theming (light + `forced-colors`,
 CSS-var swap) · `PanelDescriptor` registry · Playwright E2E (+ axe per
 route×theme) · full a11y audit (✅ — ADR-017/018/019). **Phase 6 complete.**

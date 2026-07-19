@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 interface EmptyStateProps {
-  /** One short sentence naming what is empty, e.g. "No document colors". */
+  /** One short sentence naming what is empty, e.g. "No document colours". */
   title: string;
   /** Optional second line telling the user how content gets here. */
   description?: string;

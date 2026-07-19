@@ -26,7 +26,7 @@ export function AssetsPanel() {
     return (
       <EmptyState
         icon={<Palette size={16} />}
-        title="No document colors"
+        title="No document colours"
         description="Fills and strokes used by shapes appear here. Draw a rectangle (R) to get started."
       />
     );

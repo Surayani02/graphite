@@ -210,7 +210,7 @@ describe("Phase 4 viewport message", () => {
     // Camera at (100, 50), zoom 1, viewport 800×600.
     // Pivot cursor at physical (200, 150) — deliberately OFF-CENTER
     // (viewport center would be 400,300). An earlier version of this test
-    // used a centered pivot, which makes (pivotPhys - vp/2) zero on both
+    // used a centred pivot, which makes (pivotPhys - vp/2) zero on both
     // axes — the camera mathematically can't move in that case regardless
     // of zoom, which made the test pass for the wrong reason while also
     // asserting an arithmetically incorrect expected value. An off-center

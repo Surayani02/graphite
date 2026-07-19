@@ -86,7 +86,7 @@ describe("LeftPanel", () => {
     renderLeftPanel();
     await userEvent.click(screen.getByRole("tab", { name: "Assets" }));
     expect(useUIStore.getState().leftPanelTab).toBe("assets");
-    expect(screen.getByRole("status")).toHaveTextContent("No document colors");
+    expect(screen.getByRole("status")).toHaveTextContent("No document colours");
     expect(screen.queryByRole("tree")).not.toBeInTheDocument();
   });
 
