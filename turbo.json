@@ -4,7 +4,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", "pkg/**"]
+      "outputs": ["dist/**", "pkg/**"],
+      "env": ["DEPLOY_TARGET"]
     },
     "typecheck": {
       "dependsOn": ["^build"],
