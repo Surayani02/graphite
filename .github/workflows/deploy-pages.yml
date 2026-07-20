@@ -1,0 +1,105 @@
+# Deploys apps/web to GitHub Pages as a project page (username.github.io/graphite/).
+#
+# Lives ONLY on the `deploy` branch — it is intentionally absent from
+# `main`, so main's tree stays pure product with no deploy plumbing. To
+# publish, merge main into deploy and push (see the apply guide's sync
+# step); this workflow then builds and deploys.
+#
+# Separate from ci.yml on purpose: CI gates correctness on every push/PR;
+# this publishes a preview for the design team, triggered by pushes to the
+# `deploy` branch and by manual dispatch. It builds the REAL WASM engine
+# (wasm-pack, pinned — same version as ci.yml), sets DEPLOY_TARGET=gh-pages
+# so Vite emits the /graphite/ base path, and adds the SPA 404.html
+# fallback that GitHub Pages needs for client-side routes.
+#
+# The base-path support it relies on (vite.config.ts, src/router.ts) lives
+# on MAIN — it is inert without DEPLOY_TARGET=gh-pages, so it never affects
+# the product, and keeping it on main makes deploy a conflict-free
+# fast-forward of main + this one file.
+#
+# One-time repo setup (Settings → Pages): set "Build and deployment" →
+# Source = "GitHub Actions".
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [deploy]
+  workflow_dispatch: {}
+
+# Pages needs these permissions; the token is scoped to this deploy only.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One live deploy at a time; a newer run supersedes an in-flight one but
+# lets it finish so a half-published site is never served.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build (web + WASM engine)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/engine
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          # Pinned to match ci.yml — the action's "latest" can resolve to a
+          # build predating --no-pack and fail. v0.13.x supports it.
+          version: "v0.13.1"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (engine + web, Pages base path)
+        env:
+          DEPLOY_TARGET: gh-pages
+        run: pnpm turbo run build
+
+      - name: Add SPA fallback (404.html = index.html)
+        # GitHub Pages has no server rewrites, so a refresh on
+        # /graphite/settings would 404. Serving index.html's content as
+        # 404.html hands the URL to the (base-aware) SPA router instead.
+        run: cp apps/web/dist/index.html apps/web/dist/404.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
