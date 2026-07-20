@@ -11,6 +11,15 @@ updates:
     groups:
       npm-minor-and-patch:
         update-types: ["minor", "patch"]
+    # TypeScript 7 is the native ("Corsa") rewrite; typescript-eslint 8.x
+    # crashes under it (peer range excludes >=6.1.0), so a TS-7 bump would
+    # red the lint gate with no code change on our side. Hold TS at major 6
+    # until typescript-eslint ships TS-7 support, then bump both together.
+    # Minor/patch TS 6.x updates still flow through the group above.
+    # (Re-evaluate: PR #6, closed 2026-07.)
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "cargo"
     directory: "/"

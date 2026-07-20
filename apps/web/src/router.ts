@@ -28,6 +28,13 @@ const routeTree = rootRoute.addChildren([editorRoute, settingsRoute, catchAllRou
 
 export const router = createRouter({
   routeTree,
+  // Deployment base path. Vite injects `import.meta.env.BASE_URL` from the
+  // build's `base` config: "/" for local dev and root hosting, "/graphite/"
+  // for the GitHub Pages project page. TanStack strips the trailing slash
+  // itself. Without this the router would treat "/graphite/settings" as an
+  // unknown path and bounce it through the catch-all on every load under
+  // Pages. Keeping it env-driven means dev and prod share one router.
+  basepath: import.meta.env.BASE_URL,
 });
 
 declare module "@tanstack/react-router" {
