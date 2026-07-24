@@ -144,16 +144,18 @@ its migration, path ops (C1.1, C1.4) ·
 
 ## Performance targets
 
-| Subsystem                      | Target                                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| Canvas render                  | ≥ 60 fps (≥ 58 on HUD)                                                                                  |
-| Selection response             | < 16 ms                                                                                                 |
-| Document load (medium file)    | < 1 s                                                                                                   |
-| Collaboration propagation (P9) | < 100 ms                                                                                                |
-| Hit-test at 10k objects (P7)   | < 1 ms (linear scan measured 17.7 µs worst-case @10k — ADR-023; R-tree deferred pending the 100k probe) |
-| Inspector keystroke → frame    | ≤ 2 frames                                                                                              |
-| Command palette open (M4)      | < 50 ms                                                                                                 |
-| Object budget                  | 10k MVP / 100k system                                                                                   |
+| Subsystem                      | Target                                                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Canvas render                  | ≥ 60 fps (≥ 58 on HUD)                                                                                                      |
+| Selection response             | < 16 ms                                                                                                                     |
+| Document load (medium file)    | < 1 s                                                                                                                       |
+| Collaboration propagation (P9) | < 100 ms                                                                                                                    |
+| Hit-test at 10k objects (P7)   | < 1 ms (linear scan measured 17.7 µs worst-case @10k — ADR-023; R-tree deferred pending the 100k probe)                     |
+| Inspector keystroke → frame    | ≤ 2 frames                                                                                                                  |
+| Command palette open (M4)      | < 50 ms                                                                                                                     |
+| Object budget                  | 10k MVP / 100k system                                                                                                       |
+| Startup JS (main thread)       | < 190 kB gzip over the entry's static-import closure (ADR-024/033; PC-2 measured 177.71 kB, flat — SLO surfaces stay eager) |
+| Engine WASM binary             | Gate live in capture mode; ceiling armed from the measured pre/post-lyon pair at the geometry crate (ADR-033)               |
 
 Baselines are recorded per milestone under [`benchmarks/`](./benchmarks/).
 
@@ -202,10 +204,11 @@ shadow defaults at resolve time — the UI never advertises a chord that
 runs something else.
 
 **Routing.** TanStack Router (M5, ADR-017), code-based tree. Shipped: `/`
-editor · `/settings` (lazy). Reserved: `/plugins` (P10) · `/account` (P8) ·
+editor · `/settings` (lazy). Reserved: `/plugins` (P16) · `/account` (P11) ·
 `/docs/*`. Engine worker + global shortcuts are editor-route-scoped;
-unknown paths redirect to the editor. Main-chunk ceiling 190 kB gzip
-(recalibrated from 175 kB — ADR-024).
+unknown paths redirect to the editor. Startup-JS ceiling 190 kB gzip over
+the entry's static-import closure (recalibrated from 175 kB — ADR-024;
+closure measurement + lazy islands — ADR-033).
 
 **File organization.** Feature folders adopted M3 (`features/tools`,
 `features/layers`, `features/inspector`); `contexts/` renamed from

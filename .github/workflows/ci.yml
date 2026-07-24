@@ -76,6 +76,13 @@ jobs:
       - name: Bundle size gate
         run: node scripts/check-bundle-size.mjs
 
+      # ADR-033: the engine binary's own budget line, alongside the JS
+      # ceiling above. Ships in capture mode (prints the measured size,
+      # passes) and is armed with a measured ceiling in the
+      # geometry-crate commit — the script header is the source of truth.
+      - name: WASM size gate
+        run: node scripts/check-wasm-size.mjs
+
       - name: Type check
         run: pnpm turbo run typecheck
 

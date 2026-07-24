@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Shared type definitions, IPC message schemas, and network protocol for Graphite.",
+  "sideEffects": false,
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

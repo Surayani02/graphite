@@ -34,8 +34,13 @@ function entryText(entry: PaletteEntry): string {
  * through the registry; layer rows select the node and reveal the Layers
  * tab (which also expands a collapsed panel, per the store contract).
  *
- * Mounted permanently by AppShell: opening is a state flip on an
- * already-populated registry — no lazy import on the <50ms hot path. The
+ * Mounted permanently and *eagerly* by AppShell — deliberately NOT a lazy
+ * island. PC-2 tried the island and the reference machine falsified it:
+ * a first open measured 347 ms against the 150 ms e2e gate, because on
+ * two cores the deferred chunk's evaluation competes with startup and is
+ * not resident by first input. Surfaces carrying an open-latency SLO are
+ * never islands (ADR-033 §2 amendment); opening must stay a state flip
+ * on an already-evaluated module and an already-populated registry. The
  * effect below closes the `graphite:palette-open` performance measure one
  * painted frame after opening (see docs/benchmarks/phase6-m4.md).
  */

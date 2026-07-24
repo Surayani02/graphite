@@ -23,6 +23,8 @@
 
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -31,7 +33,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ModalDialog } from "@graphite/ui-core";
 import { useEngineContext } from "../../contexts/EngineContext";
 import { createFileGateway, type ExportBlobOptions, type FileGateway } from "./gateway";
 import {
@@ -40,6 +41,10 @@ import {
   serializeGraphiteFile,
   suggestedFileName,
 } from "@graphite/document-model";
+
+const DiscardConfirmDialogLazy = lazy(async () => ({
+  default: (await import("./DiscardConfirmDialog")).DiscardConfirmDialog,
+}));
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 
@@ -248,41 +253,15 @@ export function FilesProvider({
   return (
     <FilesContext.Provider value={value}>
       {children}
-      <ModalDialog
-        isOpen={pendingDiscard !== null}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setPendingDiscard(null);
-        }}
-        label="Unsaved changes"
-        widthClassName="w-full max-w-sm"
-      >
-        <div className="p-4">
-          <p className="text-sm text-content-primary">
-            {pendingDiscard === "open" ? "Open another file?" : "Start a new document?"}
-          </p>
-          <p className="mt-1 text-xs text-content-tertiary">
-            Unsaved changes will be lost. Save first with <span className="font-mono">mod+S</span>.
-          </p>
-          <div className="mt-4 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setPendingDiscard(null);
-              }}
-              className="rounded px-2.5 py-1 font-mono text-xs text-content-secondary hover:bg-surface-panel-hover"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={confirmDiscard}
-              className="rounded px-2.5 py-1 font-mono text-xs text-danger hover:bg-surface-panel-hover"
-            >
-              Discard changes
-            </button>
-          </div>
-        </div>
-      </ModalDialog>
+      <Suspense fallback={null}>
+        <DiscardConfirmDialogLazy
+          pending={pendingDiscard}
+          onCancel={() => {
+            setPendingDiscard(null);
+          }}
+          onConfirm={confirmDiscard}
+        />
+      </Suspense>
     </FilesContext.Provider>
   );
 }
