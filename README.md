@@ -2,7 +2,9 @@
 
 Open-source, browser-based, high-performance collaborative graphics platform.
 
-> **Status**: 🔄 Phase 7 (MVP) in flight — M1–M5 delivered: undo/redo (ADR-020), `.graphite` save/load with autosave (ADR-021), damage-model rendering + honest hit-test benches with CI-gated Criterion ceilings (ADR-025), SVG + PNG/JPEG export (ADR-026), and the deterministic 10k/100k stress probe behind dev-only Debug commands (ADR-027). Remaining: the reference-machine capture ([docs/benchmarks/phase7-stress.md](docs/benchmarks/phase7-stress.md)) — the Phase 7 exit gate. Phase 6 (UI shell: design tokens, app shell, panels, tools, palette, shortcuts, routing, theming, a11y + E2E gate) and everything before it: ✅ complete.
+> **Status**: 🔄 Phase 7 (MVP) closing — M1–M5 delivered: undo/redo (ADR-020), `.graphite` save/load with autosave (ADR-021), damage-model rendering + honest hit-test benches with CI-gated Criterion ceilings (ADR-025), SVG + PNG/JPEG export (ADR-026), and the deterministic 10k/100k stress probe behind dev-only Debug commands (ADR-027). Remaining: the reference-machine capture ([docs/benchmarks/phase7-stress.md](docs/benchmarks/phase7-stress.md)) — the phase exit gate, whose 100k hit-test result feeds ADR-023. Phase 6 (UI shell) and everything before it: ✅ complete.
+>
+> **Next**: the Figma-parity programme. Committed feature scope and per-item status: [docs/PARITY.md](docs/PARITY.md). Architecture and sequencing: [docs/roadmap/INTEGRATION-BLUEPRINT.md](docs/roadmap/INTEGRATION-BLUEPRINT.md). Phase 8 is **Vector & Text** — backend and collaboration keep their scope but move to Phases 11 and 12 so the document schema settles before the CRDT binding is authored (ADR-029).
 
 ## Prerequisites
 

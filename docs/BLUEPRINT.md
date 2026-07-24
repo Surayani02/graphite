@@ -84,10 +84,24 @@ stays off (ADR-003).
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | 0–5   | Foundation → engine → rendering → interaction → document model                                                                             | ✅ Complete |
 | 6     | UI shell                                                                                                                                   | ✅ Complete |
-| 7     | **MVP**: file save/load, export, undo/redo, damage model (dirty flags), 10k verification — spatial index deferred by measurement (ADR-023) | ⏳          |
-| 8     | Backend: Axum, PostgreSQL, Redis, JWT auth, S3                                                                                             | ⏳          |
-| 9     | Collaboration: Yjs CRDT + WebSocket sync                                                                                                   | ⏳          |
-| 10+   | Plugins, components, variables, offline, docking                                                                                           | ⏳          |
+| 7     | **MVP**: file save/load, export, undo/redo, damage model (dirty flags), 10k verification — spatial index deferred by measurement (ADR-023) | ⏳ closing  |
+| 8     | **Vector & Text**: path render pipeline (ADR-031), geometry crate, booleans, text engine — epics C1, C4                                    | ⏳          |
+| 9     | **Layout**: auto layout, 2D grid, constraints — epic C2                                                                                    | ⏳          |
+| 10    | **Components & Variables**: component system, styles, variables and tokens — epics C3, A2                                                  | ⏳          |
+| 11    | **Backend**: Axum, PostgreSQL, Redis, JWT auth, S3                                                                                         | ⏳          |
+| 12    | **Collaboration**: Yjs CRDT + WebSocket sync, presence, comments, versions, permissions — epic C6                                          | ⏳          |
+| 13    | Prototyping runtime — epic C5                                                                                                              | ⏳          |
+| 14    | Dev mode & code handoff — epic A3                                                                                                          | ⏳          |
+| 15    | Illustration mode — epic A1                                                                                                                | ⏳          |
+| 16    | Plugins & extensibility                                                                                                                    | ⏳          |
+| 17+   | AI layer and remaining gated items — epic A4                                                                                               | ⏳          |
+
+Phases 11 and 12 keep the standing backend and collaboration **scope**
+verbatim; ADR-029 moved their **position** so the document schema settles
+before the CRDT binding is authored. Committed feature scope and per-item
+status live in [PARITY.md](./PARITY.md); the programme's architectural
+plan lives in
+[roadmap/INTEGRATION-BLUEPRINT.md](./roadmap/INTEGRATION-BLUEPRINT.md).
 
 Phase 6 milestones: **M1** design tokens + app shell (✅) · **M2** Layers +
 Inspector (✅) · **M3** tools rail, rectangle/ellipse creation tools,
