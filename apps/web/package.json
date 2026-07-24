@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@graphite/engine": "workspace:*",
+    "@graphite/document-model": "workspace:*",
     "@graphite/protocol": "workspace:*",
     "@graphite/ui-core": "workspace:*",
     "@tanstack/react-router": "1.170.18",

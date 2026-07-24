@@ -41,6 +41,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@graphite/document-model':
+        specifier: workspace:*
+        version: link:../../packages/document-model
       '@graphite/engine':
         specifier: workspace:*
         version: link:../../packages/engine
@@ -130,6 +133,25 @@ importers:
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
+
+  packages/document-model:
+    dependencies:
+      '@graphite/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: 4.1.10
+        version: 4.1.10(vitest@4.1.10)
+      rimraf:
+        specifier: ^6.1.3
+        version: 6.1.3
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.10(@types/node@26.1.1)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.5(@types/node@26.1.1)(jiti@2.7.0))
 
   packages/engine:
     devDependencies:

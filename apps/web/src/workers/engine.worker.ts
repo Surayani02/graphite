@@ -17,7 +17,7 @@
 
 import init, { version } from "@graphite/engine";
 import type { MainToEngineMessage } from "@graphite/protocol";
-import { DocumentModel } from "../document/model";
+import { DocumentModel } from "@graphite/document-model";
 import { createInitialState } from "./engine/state";
 import { post, toErrorMsg } from "./engine/messaging";
 import {

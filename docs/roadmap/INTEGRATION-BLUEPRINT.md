@@ -206,9 +206,10 @@ complicate the Turborepo build graph for no benefit.
 **Extracting `document-model` is a monorepo change and needs an ADR.**
 Justification: it is the source of truth, and Phase 11 (backend
 persistence) and Phase 12 (CRDT binding) both need it without depending on
-`apps/web`. Today it lives in `apps/web/src/document/` — correct when the
-web app was its only consumer, wrong the moment the server and the CRDT
-layer are consumers too. Do it _before_ those phases, not during.
+`apps/web`. It lived in `apps/web/src/document/` — correct while the web app was its
+only consumer, wrong the moment the server and the CRDT layer are
+consumers too — until Phase 8 PC-1 delivered the extraction (2026-07-25),
+before those phases rather than during them.
 
 **Boundary rule, unchanged and non-negotiable.** React owns UI chrome. The
 worker owns the render loop, GPU state, the interaction hot path, and the
@@ -508,5 +509,8 @@ above); the `document-model` extraction (ADR-030) is precondition commit
 PC-1 — the first commit of Phase E, before any feature code, standalone
 and suite-proved as specified.
 
-**Next: Phase E** — PC-1 extraction → PC-2 code splitting + budget lines →
-geometry crate onward, per the design doc's implementation plan.
+**Phase E progress:** PC-1 (`document-model` extraction) ✅ delivered
+2026-07-25 — 543 tests green across four TypeScript packages, bundle
+neutral at 177.61 kB gzip. **Next:** PC-2 — route-level code splitting
+plus the JS/WASM budget lines, recorded as ADR-033 at decision time; then
+the geometry crate onward, per the design doc's implementation plan.

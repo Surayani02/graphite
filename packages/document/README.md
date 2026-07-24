@@ -12,7 +12,9 @@ test suite, and is part of the Cargo workspace, but nothing imports it.
 ## Where the real document model lives instead
 
 The active document model — the actual source of truth for the scene — is
-`apps/web/src/document/model.ts`, a TypeScript class. See
+the TypeScript `DocumentModel` in `@graphite/document-model`
+(`packages/document-model`, extracted from `apps/web` at Phase 8 PC-1 —
+ADR-030). See
 [ADR-011](../../docs/adr/ADR-011-typescript-document-model.md) for why:
 in short, Phase 9's collaboration layer is built on Yjs, which is
 JavaScript-native, so a TypeScript document model avoids a second WASM
@@ -22,7 +24,7 @@ initialisation step and integrates with Yjs directly.
 
 Three plausible futures exist, and none has been decided yet:
 
-1. **Stays unused indefinitely** — if `apps/web/src/document/model.ts`
+1. **Stays unused indefinitely** — if `@graphite/document-model`
    continues to scale fine in pure TypeScript (current target: <15ms to
    parse/validate a 1,000-node document — see `document.bench.ts`), there
    may never be a reason to revisit this.

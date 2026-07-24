@@ -15,7 +15,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { EngineToMainMessage } from "@graphite/protocol";
 import type { EngineState } from "../workers/engine/state";
-import { DocumentModel } from "../document/model";
+import { DocumentModel } from "@graphite/document-model";
 import { History } from "../workers/engine/history";
 
 const { rebuildSpy } = vi.hoisted(() => ({ rebuildSpy: vi.fn() }));

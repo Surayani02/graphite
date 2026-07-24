@@ -1,5 +1,6 @@
 /**
- * Graphite document model — Phase 5, extended Phase 6 Milestone 2.
+ * Graphite document model — Phase 5, extended Phase 6 M2; extracted to
+ * `@graphite/document-model` at Phase 8 PC-1 (ADR-030).
  *
  * Source of truth for the scene.  The SceneGraph in the engine worker is a
  * derived, ephemeral rendering structure rebuilt from this model on every load.
@@ -7,20 +8,19 @@
  * Design notes:
  *   - Node IDs are UUID v4 strings, stable across serialisation cycles.
  *   - `cornerRadius` is stored on all node kinds (ignored by the Ellipse SDF).
- *   - Phase 9 (Yjs CRDT) wraps this model's mutation methods directly.
+ *   - Phase 12 (Yjs CRDT — ADR-029) wraps this model's mutation methods
+ *     directly.
  *   - This file has zero DOM or WebWorker dependencies — it runs in both.
  *   - Colour values use `Color` from `@graphite/protocol` (0–255 straight
  *     alpha) rather than a locally-defined type — see ADR-007 / BUG-01.
- *   - `DocNode`/`DocNodeKind`/`DocStroke`/`DocumentData` moved to
- *     `@graphite/protocol` in Phase 6 M2 (the `document:nodes` IPC message
- *     needs this shape, and protocol can't depend back on apps/web) and are
- *     re-exported below so existing imports from this module don't break.
+ *   - `DocNode`/`DocNodeKind`/`DocStroke`/`DocumentData` live in
+ *     `@graphite/protocol` (the crossing contract — ADR-009) and are not
+ *     re-exported here: consumers import wire types from protocol
+ *     directly (ADR-030).
  */
 
-import type { Color, DocNode, DocNodeKind, DocStroke, DocumentData } from "@graphite/protocol";
+import type { Color, DocNode, DocStroke, DocumentData } from "@graphite/protocol";
 import { assertValidDocumentData } from "./validate";
-
-export type { Color, DocNode, DocNodeKind, DocStroke, DocumentData };
 
 // ─── DocumentModel ────────────────────────────────────────────────────────────
 

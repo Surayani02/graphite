@@ -16,7 +16,7 @@
  * ADR-010).
  */
 
-import type { DocNode, DocNodeKind, DocumentData } from "./model";
+import type { DocNode, DocNodeKind, DocumentData } from "@graphite/protocol";
 
 const VALID_NODE_KINDS: ReadonlySet<DocNodeKind> = new Set(["frame", "rect", "ellipse"]);
 

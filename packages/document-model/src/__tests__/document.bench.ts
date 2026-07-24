@@ -5,7 +5,7 @@
  * Targets:  serialize 1 000 nodes < 10 ms, fromJson 1 000 nodes < 15 ms
  */
 import { bench, describe } from "vitest";
-import { DocumentModel } from "../document/model";
+import { DocumentModel } from "../model";
 import type { Color } from "@graphite/protocol";
 
 const FILL: Color = { r: 99, g: 179, b: 237, a: 255 };

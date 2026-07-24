@@ -54,9 +54,10 @@ graphite/
 │   ├── protocol       Shared TypeScript types (IPC + network schema)
 │   ├── engine         Rust graphics engine → WASM
 │   ├── document       Placeholder — see docs/adr/ADR-010
-│   ├── crdt           CRDT collaboration (Phase 9)
+│   ├── document-model Document model + .graphite format (ADR-030)
+│   ├── crdt           CRDT collaboration (Phase 12)
 │   ├── ui-core        Design tokens + React primitives (Phase 6+)
-│   └── plugin-api     Plugin system API (Phase 10+)
+│   └── plugin-api     Plugin system API (Phase 16)
 └── docs/
     ├── BLUEPRINT.md   Engineering blueprint — the map
     ├── adr/           Architecture Decision Records

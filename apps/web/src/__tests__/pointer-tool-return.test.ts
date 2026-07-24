@@ -12,7 +12,7 @@
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { EngineState } from "../workers/engine/state";
-import { DocumentModel } from "../document/model";
+import { DocumentModel } from "@graphite/document-model";
 import { History } from "../workers/engine/history";
 
 vi.mock("../workers/engine/messaging", () => ({

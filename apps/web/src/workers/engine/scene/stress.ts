@@ -1,6 +1,5 @@
 import type { Color } from "@graphite/protocol";
-import { DocumentModel } from "../../../document/model";
-import { DOCUMENT_LIMITS } from "../../../document/validate";
+import { DOCUMENT_LIMITS, DocumentModel } from "@graphite/document-model";
 import type { EngineState } from "../state";
 
 /**

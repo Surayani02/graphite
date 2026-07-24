@@ -20,7 +20,7 @@
 
 import type { SceneGraph } from "@graphite/engine";
 import { DEFAULT_CAMERA, type ToolType } from "@graphite/protocol";
-import type { DocumentModel } from "../../document/model";
+import type { DocumentModel } from "@graphite/document-model";
 import { History } from "./history";
 
 /**

@@ -1,11 +1,11 @@
 /**
- * features/files/format.ts unit tests — envelope round-trip, every typed
+ * format.ts unit tests — envelope round-trip, every typed
  * error code, the migration runner, and file-name derivation. Documents
  * built through the real DocumentModel so "what serialize emits" and
  * "what parse accepts" can never drift apart.
  */
 import { describe, expect, it, vi } from "vitest";
-import { DocumentModel } from "../document/model";
+import { DocumentModel } from "../model";
 import {
   FILE_MIGRATIONS,
   FileFormatError,
@@ -15,7 +15,7 @@ import {
   serializeGraphiteFile,
   suggestedFileName,
   type FileMigration,
-} from "../features/files/format";
+} from "../format";
 
 const FILL = { r: 255, g: 128, b: 0, a: 255 } as const;
 

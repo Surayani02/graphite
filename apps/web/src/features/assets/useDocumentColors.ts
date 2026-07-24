@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { type Color, type DocNode } from "@graphite/protocol";
 import { useEngineContext } from "../../contexts/EngineContext";
-import { colorToHex } from "../../document/color";
+import { colorToHex } from "@graphite/ui-core";
 
 export interface DocumentColor {
   /** The exact protocol color, kept for lossless write-back on apply. */

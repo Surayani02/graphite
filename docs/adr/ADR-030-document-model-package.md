@@ -1,6 +1,6 @@
 # ADR-030: Document Model Package Extraction
 
-- **Status:** Accepted (design decision — implementation not yet scheduled)
+- **Status:** Accepted — implemented at Phase 8 PC-1 (2026-07-25)
 - **Date:** 2026-07-20
 - **Phase:** Precedes Phase 11; best landed early in the Phase 8–10 window
 - **Related:** ADR-001 (monorepo structure), ADR-009 (protocol-first IPC),

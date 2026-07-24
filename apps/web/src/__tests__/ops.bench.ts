@@ -18,8 +18,7 @@
  */
 import { bench, describe } from "vitest";
 import type { Color, DocNode } from "@graphite/protocol";
-import { DocumentModel } from "../document/model";
-import { applyOp, effectiveNodePatch } from "../document/ops";
+import { DocumentModel, applyOp, effectiveNodePatch } from "@graphite/document-model";
 import { History, type HistoryEntry } from "../workers/engine/history";
 
 const FILL: Color = { r: 99, g: 179, b: 237, a: 255 };

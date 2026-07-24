@@ -4,8 +4,8 @@
  */
 import { describe, expect, it } from "vitest";
 import type { DocNode } from "@graphite/protocol";
-import { DocumentModel } from "../document/model";
-import { assertValidDocumentData, type ValidationLimits } from "../document/validate";
+import { DocumentModel } from "../model";
+import { assertValidDocumentData, type ValidationLimits } from "../validate";
 
 const FILL = { r: 255, g: 128, b: 0, a: 255 } as const;
 

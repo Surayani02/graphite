@@ -133,7 +133,8 @@ export interface KeyboardModifiers {
 
 // ─── Document node model (Phase 6 M2) ────────────────────────────────────────
 //
-// Relocated here from apps/web/src/document/model.ts. The document:nodes IPC
+// Relocated here from the document model in Phase 6 M2 (the model itself
+// now lives in @graphite/document-model — ADR-030). The document:nodes IPC
 // message (below) needs to carry this shape, and packages/protocol cannot
 // depend on apps/web — that would invert the intended dependency direction
 // (protocol is the thing other packages import, never the reverse), the

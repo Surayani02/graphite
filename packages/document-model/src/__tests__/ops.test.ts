@@ -6,8 +6,8 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Color, DocNode, DocumentOp, NodePatch } from "@graphite/protocol";
-import { DocumentModel } from "../document/model";
-import { applyOp, effectiveNodePatch, isEmptyPatch, OpError } from "../document/ops";
+import { DocumentModel } from "../model";
+import { applyOp, effectiveNodePatch, isEmptyPatch, OpError } from "../ops";
 
 const FILL: Color = { r: 255, g: 128, b: 0, a: 255 };
 const BLUE: Color = { r: 0, g: 0, b: 255, a: 255 };
