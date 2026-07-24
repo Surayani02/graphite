@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MVP_MAX_OBJECTS, SYSTEM_MAX_OBJECTS } from "@graphite/protocol";
-import { DOCUMENT_LIMITS, assertValidDocumentData } from "../document/validate";
+import { DOCUMENT_LIMITS, assertValidDocumentData } from "@graphite/document-model";
 import type { EngineState } from "../workers/engine/state";
 import { STRESS_FRAME_ID, buildStressScene, stressShapeId } from "../workers/engine/scene/stress";
 

@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { EngineContext } from "../contexts/EngineContext";
 import { AssetsPanel } from "../features/assets/AssetsPanel";
 import { deriveDocumentColors } from "../features/assets/useDocumentColors";
-import { colorToHex } from "../document/color";
+import { colorToHex } from "@graphite/ui-core";
 import { useUIStore } from "../stores/uiStore";
 import type { UseEngineResult } from "../hooks/useEngine";
 import type { DocNode } from "@graphite/protocol";

@@ -28,7 +28,12 @@
  */
 
 import type { DocNode, DocumentOp, HistoryAnnounce, NodePatch } from "@graphite/protocol";
-import { applyOp, effectiveNodePatch, isEmptyPatch, type AppliedOp } from "../../../document/ops";
+import {
+  applyOp,
+  effectiveNodePatch,
+  isEmptyPatch,
+  type AppliedOp,
+} from "@graphite/document-model";
 import { markSceneDirty, type EngineState } from "../state";
 import { post, toErrorMsg } from "../messaging";
 import { setSelection } from "../selection";

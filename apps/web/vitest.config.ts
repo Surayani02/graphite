@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@graphite/protocol": resolve(import.meta.dirname, "../../packages/protocol/src/index.ts"),
+      "@graphite/document-model": resolve(
+        import.meta.dirname,
+        "../../packages/document-model/src/index.ts"
+      ),
     },
   },
   test: {
@@ -28,15 +32,20 @@ export default defineConfig({
         "src/main.tsx",
         "src/workers/engine/gpu/**",
       ],
-      // Regression floors from measured actuals (2026-07-14: statements
-      // 71.87, branches 70.23, functions 73.47, lines 71.31) minus a ~3 pt
-      // churn margin — see ADR-022. Raise these as coverage rises; never
-      // lower them to admit a regression.
+      // Regression floors from measured actuals minus a ~3 pt churn margin
+      // — see ADR-022. Raise these as coverage rises; never lower them to
+      // admit a regression. Re-based at PC-1 (ADR-030, 2026-07-25) when the
+      // document model — the app's best-covered module family — moved to
+      // @graphite/document-model, which enforces its own floors: the
+      // partition changed this suite's denominator, not any line's
+      // coverage. Measured after extraction: statements 69.14, branches
+      // 64.55, functions 72.59, lines 68.62 (previous basis 2026-07-14:
+      // 71.87 / 70.23 / 73.47 / 71.31).
       thresholds: {
-        statements: 68,
-        branches: 67,
-        functions: 70,
-        lines: 68,
+        statements: 66,
+        branches: 61,
+        functions: 69,
+        lines: 65,
       },
     },
     benchmark: {

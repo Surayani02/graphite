@@ -2,9 +2,9 @@
 
 Open-source, browser-based, high-performance collaborative graphics platform.
 
-> **Status**: 🔄 Phase 7 (MVP) closing — M1–M5 delivered: undo/redo (ADR-020), `.graphite` save/load with autosave (ADR-021), damage-model rendering + honest hit-test benches with CI-gated Criterion ceilings (ADR-025), SVG + PNG/JPEG export (ADR-026), and the deterministic 10k/100k stress probe behind dev-only Debug commands (ADR-027). Remaining: the reference-machine capture ([docs/benchmarks/phase7-stress.md](docs/benchmarks/phase7-stress.md)) — the phase exit gate, whose 100k hit-test result feeds ADR-023. Phase 6 (UI shell) and everything before it: ✅ complete.
+> **Status**: ✅ Phase 7 (MVP) complete — undo/redo (ADR-020), `.graphite` save/load with autosave (ADR-021), damage-model rendering + honest hit-test benches with CI-gated Criterion ceilings (ADR-025), SVG + PNG/JPEG export (ADR-026), the deterministic 10k/100k stress probe (ADR-027), and the reference-machine capture whose 100k hit-test basis is recorded in [benchmarks/ceilings.json](benchmarks/ceilings.json). 🔨 Phase 8 (Vector & Text, ADR-029) is open at **M1 — the path render pipeline**: design and contracts committed ([docs/design/phase8-m1-path-pipeline.md](docs/design/phase8-m1-path-pipeline.md), ADR-031/032); implementation opens with the ADR-030 `document-model` extraction and the code-splitting precondition commits. Phase 6 (UI shell) and everything before it: ✅ complete.
 >
-> **Next**: the Figma-parity programme. Committed feature scope and per-item status: [docs/PARITY.md](docs/PARITY.md). Architecture and sequencing: [docs/roadmap/INTEGRATION-BLUEPRINT.md](docs/roadmap/INTEGRATION-BLUEPRINT.md). Phase 8 is **Vector & Text** — backend and collaboration keep their scope but move to Phases 11 and 12 so the document schema settles before the CRDT binding is authored (ADR-029).
+> **Next**: Phase 8 M1 Phase E — precondition commits (extraction; code splitting + budgets), then the geometry crate. Programme scope and per-item status: [docs/PARITY.md](docs/PARITY.md); architecture and sequencing: [docs/roadmap/INTEGRATION-BLUEPRINT.md](docs/roadmap/INTEGRATION-BLUEPRINT.md) — backend and collaboration keep their scope at Phases 11 and 12 so the document schema settles before the CRDT binding is authored (ADR-029).
 
 ## Prerequisites
 
@@ -49,14 +49,15 @@ for the full pre-PR checklist.
 graphite/
 ├── apps/
 │   ├── web            React + Vite browser application
-│   └── server         Rust + Axum backend (Phase 8)
+│   └── server         Rust + Axum backend (Phase 11)
 ├── packages/
 │   ├── protocol       Shared TypeScript types (IPC + network schema)
 │   ├── engine         Rust graphics engine → WASM
 │   ├── document       Placeholder — see docs/adr/ADR-010
-│   ├── crdt           CRDT collaboration (Phase 9)
+│   ├── document-model Document model + .graphite format (ADR-030)
+│   ├── crdt           CRDT collaboration (Phase 12)
 │   ├── ui-core        Design tokens + React primitives (Phase 6+)
-│   └── plugin-api     Plugin system API (Phase 10+)
+│   └── plugin-api     Plugin system API (Phase 16)
 └── docs/
     ├── BLUEPRINT.md   Engineering blueprint — the map
     ├── adr/           Architecture Decision Records

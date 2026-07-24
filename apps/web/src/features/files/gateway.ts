@@ -23,7 +23,7 @@
  * (ADR-021).
  */
 
-import { GRAPHITE_FILE_EXTENSION, GRAPHITE_FILE_MIME } from "./format";
+import { GRAPHITE_FILE_EXTENSION, GRAPHITE_FILE_MIME } from "@graphite/document-model";
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 

@@ -39,7 +39,7 @@ import {
   parseGraphiteFile,
   serializeGraphiteFile,
   suggestedFileName,
-} from "./format";
+} from "@graphite/document-model";
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 

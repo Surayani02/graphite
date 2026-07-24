@@ -13,8 +13,8 @@
  */
 import { bench, describe } from "vitest";
 import type { Color } from "@graphite/protocol";
-import { DocumentModel } from "../document/model";
-import { parseGraphiteFile, serializeGraphiteFile } from "../features/files/format";
+import { DocumentModel } from "../model";
+import { parseGraphiteFile, serializeGraphiteFile } from "../format";
 
 const FILL: Color = { r: 99, g: 179, b: 237, a: 255 };
 

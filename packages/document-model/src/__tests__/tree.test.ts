@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { DocNode } from "@graphite/protocol";
-import { buildTree } from "../document/tree";
+import { buildTree } from "../tree";
 
 function node(overrides: Partial<DocNode>): DocNode {
   return {

@@ -16,8 +16,8 @@ import type { UseEngineResult } from "../hooks/useEngine";
 import { EngineContext } from "../contexts/EngineContext";
 import { FilesProvider, useFiles } from "../features/files/FilesProvider";
 import type { FileGateway } from "../features/files/gateway";
-import { serializeGraphiteFile } from "../features/files/format";
-import { DocumentModel } from "../document/model";
+import { serializeGraphiteFile } from "@graphite/document-model";
+import { DocumentModel } from "@graphite/document-model";
 
 const FILL = { r: 255, g: 128, b: 0, a: 255 } as const;
 

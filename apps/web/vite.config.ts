@@ -18,6 +18,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@graphite/protocol": resolve(import.meta.dirname, "../../packages/protocol/src/index.ts"),
+      "@graphite/document-model": resolve(
+        import.meta.dirname,
+        "../../packages/document-model/src/index.ts"
+      ),
       "@graphite/ui-core": resolve(import.meta.dirname, "../../packages/ui-core/src/index.ts"),
       "@graphite/crdt": resolve(import.meta.dirname, "../../packages/crdt/src/index.ts"),
       "@graphite/plugin-api": resolve(

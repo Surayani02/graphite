@@ -3,7 +3,7 @@ import { Trash2 } from "lucide-react";
 import type { DocNodeKind } from "@graphite/protocol";
 import { ContextMenu, useContextMenuState, type MenuItem } from "@graphite/ui-core";
 import { useEngineContext } from "../../contexts/EngineContext";
-import { buildTree, type TreeNode } from "../../document/tree";
+import { buildTree, type TreeNode } from "@graphite/document-model";
 import { useCommandShortcut } from "../shortcuts/useResolvedShortcuts";
 
 /**

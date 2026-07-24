@@ -23,16 +23,17 @@ implementation plan for the parity programme.
 
 ## Engine, rendering, and performance
 
-| ADR                                        | Decision                                                                                   |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| [002](./ADR-002-webgpu-rendering-api.md)   | WebGPU as the rendering API; no WebGL fallback                                             |
-| [004](./ADR-004-rust-wasm-engine.md)       | Rust compiled to WebAssembly for the graphics engine                                       |
-| [005](./ADR-005-wasm-bindgen.md)           | wasm-bindgen for the JS↔WASM boundary                                                      |
-| [006](./ADR-006-sdf-shape-rendering.md)    | Signed-distance-field rendering for primitive shapes                                       |
-| [008](./ADR-008-slot-map-scene-storage.md) | Arena slot-map scene storage; ids never reused                                             |
-| [023](./ADR-023-spatial-index-deferral.md) | Spatial index deferred — linear hit-test measured sufficient; re-adoption trigger recorded |
-| [025](./ADR-025-damage-model.md)           | Damage-tracked render loop with explicit paint order; parks when idle                      |
-| [031](./ADR-031-general-path-rendering.md) | Hybrid pipeline — SDF fast path retained, lyon tessellation added for paths and glyphs     |
+| ADR                                            | Decision                                                                                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| [002](./ADR-002-webgpu-rendering-api.md)       | WebGPU as the rendering API; no WebGL fallback                                                                                  |
+| [004](./ADR-004-rust-wasm-engine.md)           | Rust compiled to WebAssembly for the graphics engine                                                                            |
+| [005](./ADR-005-wasm-bindgen.md)               | wasm-bindgen for the JS↔WASM boundary                                                                                           |
+| [006](./ADR-006-sdf-shape-rendering.md)        | Signed-distance-field rendering for primitive shapes                                                                            |
+| [008](./ADR-008-slot-map-scene-storage.md)     | Arena slot-map scene storage; ids never reused                                                                                  |
+| [023](./ADR-023-spatial-index-deferral.md)     | Spatial index deferred — linear hit-test measured sufficient; re-adoption trigger recorded                                      |
+| [025](./ADR-025-damage-model.md)               | Damage-tracked render loop with explicit paint order; parks when idle                                                           |
+| [031](./ADR-031-general-path-rendering.md)     | Hybrid pipeline — SDF fast path retained, lyon tessellation added for paths and glyphs                                          |
+| [032](./ADR-032-frame-graph-and-mesh-cache.md) | Frame graph (4× MSAA, one pass), interleaved render list with run batching, mesh-handle boundary, cache mechanics, fixture mode |
 
 ## Worker boundary and IPC
 
@@ -68,5 +69,5 @@ implementation plan for the parity programme.
 
 ## Numbering
 
-Sequential, never reused. The next free number is **032**. Reserve it in
+Sequential, never reused. The next free number is **033**. Reserve it in
 your working branch before writing, so two parallel efforts do not collide.

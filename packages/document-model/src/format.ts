@@ -1,5 +1,6 @@
 /**
- * `.graphite` file format v1 — Phase 7 Milestone 2.
+ * `.graphite` file format v1 — Phase 7 M2; moved to
+ * `@graphite/document-model` at Phase 8 PC-1 (ADR-030).
  *
  * A `.graphite` file is a versioned JSON envelope around the document:
  *
@@ -15,12 +16,12 @@
  * Layering (deliberate): the engine worker never sees this envelope. Its
  * serialisation contract stays bare `DocumentData` JSON (`document:state` /
  * `document:load`, and the localStorage recovery snapshot). The envelope is
- * a *file-layer* concern, wrapped and unwrapped here on the main thread —
- * so the protocol boundary, the worker, and every existing test of them
- * are untouched by the file format's existence. The envelope types live in
- * this module rather than `@graphite/protocol` because they never cross an
- * IPC boundary; if a future server needs to read `.graphite` natively it
- * will validate in Rust anyway (see ADR-021 §Alternatives).
+ * a *file-layer* concern, wrapped and unwrapped by the hosts that touch
+ * files — today the web app's file feature on the main thread, from
+ * Phase 11 the server as well (ADR-030 §Serialisation: one
+ * implementation, no drift). The envelope types live in this package
+ * rather than `@graphite/protocol` because they never cross an IPC
+ * boundary (see ADR-021 §Alternatives).
  *
  * Output is pretty-printed (2-space indent): a `.graphite` file is a
  * source-like artifact users will diff and commit; ~30% size overhead at
@@ -28,7 +29,7 @@
  */
 
 import type { DocumentData } from "@graphite/protocol";
-import { assertValidDocumentData } from "../../document/validate";
+import { assertValidDocumentData } from "./validate";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

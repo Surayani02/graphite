@@ -206,9 +206,10 @@ complicate the Turborepo build graph for no benefit.
 **Extracting `document-model` is a monorepo change and needs an ADR.**
 Justification: it is the source of truth, and Phase 11 (backend
 persistence) and Phase 12 (CRDT binding) both need it without depending on
-`apps/web`. Today it lives in `apps/web/src/document/` — correct when the
-web app was its only consumer, wrong the moment the server and the CRDT
-layer are consumers too. Do it _before_ those phases, not during.
+`apps/web`. It lived in `apps/web/src/document/` — correct while the web app was its
+only consumer, wrong the moment the server and the CRDT layer are
+consumers too — until Phase 8 PC-1 delivered the extraction (2026-07-25),
+before those phases rather than during them.
 
 **Boundary rule, unchanged and non-negotiable.** React owns UI chrome. The
 worker owns the render loop, GPU state, the interaction hot path, and the
@@ -490,21 +491,26 @@ All four open questions are settled and recorded:
 
 ### Next deliverable
 
-**Phase 8 M1 — the path render pipeline — through Phases A–D:**
-requirements, architecture, exact file structure, and interface contracts.
-Still no implementation code.
+**Delivered 2026-07-25:**
+[design/phase8-m1-path-pipeline.md](../design/phase8-m1-path-pipeline.md)
+(Phases A–D — requirements, architecture, exact file structure, interface
+contracts) and [ADR-032](../adr/ADR-032-frame-graph-and-mesh-cache.md)
+(frame graph with one 4× MSAA target including export, interleaved render
+list with contiguous-run batching, mesh-handle tessellation boundary,
+bucket/budget/cap mechanics, engine-level fixture corpus behind an
+ADR-027 surface). The three under-scope risks called out at approval are
+all bound in that pair: the frame graph is Decision 2, golden-image
+regression is specified as a two-net strategy (exact Rust mesh snapshots +
+thresholded visual goldens), and code splitting is precondition commit
+PC-2 with its budgets recorded as ADR-033 at Phase-E entry.
 
-Three things land inside M1 that are easy to under-scope and are called out
-now so they are planned, not discovered:
+Of the two prerequisites: the Phase 7 capture is complete (decision 1
+above); the `document-model` extraction (ADR-030) is precondition commit
+PC-1 — the first commit of Phase E, before any feature code, standalone
+and suite-proved as specified.
 
-- **The frame graph.** Two passes into one multisampled target need
-  designed pass ordering and resolve, not an accretion of special cases.
-- **Golden-image visual regression**, before the first path ships.
-- **Code splitting**, which ADR-031 makes a precondition rather than a
-  future lever: ~12 kB of JS headroom does not absorb a tessellator, and
-  WASM growth needs its own budget line alongside ADR-024's ceiling.
-
-Two prerequisites are the caller's, not the architecture's: the Phase 7
-capture must be completed (decision 1), and `packages/document-model`
-should be extracted in a standalone commit (ADR-030) rather than folded
-into a feature milestone.
+**Phase E progress:** PC-1 (`document-model` extraction) ✅ delivered
+2026-07-25 — 543 tests green across four TypeScript packages, bundle
+neutral at 177.61 kB gzip. **Next:** PC-2 — route-level code splitting
+plus the JS/WASM budget lines, recorded as ADR-033 at decision time; then
+the geometry crate onward, per the design doc's implementation plan.
