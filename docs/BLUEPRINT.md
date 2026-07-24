@@ -70,13 +70,13 @@ stays off (ADR-003).
 | Package               | Role                                                                | Status                                                                                                                            |
 | --------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/web`            | Editor application (Vite + React)                                   | Active                                                                                                                            |
-| `apps/server`         | Backend (Rust + Axum)                                               | Stub, Phase 8                                                                                                                     |
+| `apps/server`         | Backend (Rust + Axum)                                               | Stub, Phase 11                                                                                                                    |
 | `packages/protocol`   | IPC + network contracts, `Color`, camera/zoom constants             | Active                                                                                                                            |
 | `packages/engine`     | Rust scene graph + geometry, compiled to WASM                       | Active                                                                                                                            |
 | `packages/document`   | Placeholder — see [ADR-010](./adr/ADR-010-document-crate-status.md) | Inert                                                                                                                             |
-| `packages/crdt`       | CRDT collaboration engine (Yjs)                                     | Stub, Phase 9                                                                                                                     |
+| `packages/crdt`       | CRDT collaboration engine (Yjs)                                     | Stub, Phase 12                                                                                                                    |
 | `packages/ui-core`    | Standalone design system: tokens + primitives                       | Live — M2 primitives + Tooltip/ContextMenu (M3) + M4 modal/tabs/palette primitives on react-aria-components (ADR-013 §4, ADR-015) |
-| `packages/plugin-api` | Sandboxed plugin system                                             | Stub, Phase 10+                                                                                                                   |
+| `packages/plugin-api` | Sandboxed plugin system                                             | Stub, Phase 16                                                                                                                    |
 
 ## Phases and milestones
 
@@ -84,8 +84,8 @@ stays off (ADR-003).
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | 0–5   | Foundation → engine → rendering → interaction → document model                                                                             | ✅ Complete |
 | 6     | UI shell                                                                                                                                   | ✅ Complete |
-| 7     | **MVP**: file save/load, export, undo/redo, damage model (dirty flags), 10k verification — spatial index deferred by measurement (ADR-023) | ⏳ closing  |
-| 8     | **Vector & Text**: path render pipeline (ADR-031), geometry crate, booleans, text engine — epics C1, C4                                    | ⏳          |
+| 7     | **MVP**: file save/load, export, undo/redo, damage model (dirty flags), 10k verification — spatial index deferred by measurement (ADR-023) | ✅ Complete |
+| 8     | **Vector & Text**: path render pipeline (ADR-031), geometry crate, booleans, text engine — epics C1, C4                                    | 🔨 M1       |
 | 9     | **Layout**: auto layout, 2D grid, constraints — epic C2                                                                                    | ⏳          |
 | 10    | **Components & Variables**: component system, styles, variables and tokens — epics C3, A2                                                  | ⏳          |
 | 11    | **Backend**: Axum, PostgreSQL, Redis, JWT auth, S3                                                                                         | ⏳          |
@@ -123,9 +123,23 @@ Criterion ceilings CI-gated (✅ — ADR-025) · **M4** export — SVG on the
 main thread, PNG/JPEG via off-screen GPU readback, one shared fit-bounds
 rule (✅ — ADR-026) · **M5** scale probe — deterministic 10k/100k stress
 scenes through the product pipeline, palette-only dev-gated `Debug`
-commands (ADR-027; **delivered — the reference-machine capture,
-[benchmarks/phase7-stress.md](./benchmarks/phase7-stress.md), is the
-phase exit gate**).
+commands (✅ — ADR-027; capture completed 2026-07-20 — the 100k hit-test basis is
+recorded in [benchmarks/ceilings.json](../benchmarks/ceilings.json) and
+feeds ADR-023). **Phase 7 complete.**
+
+Phase 8 milestones (sequenced in
+[roadmap/INTEGRATION-BLUEPRINT.md §4](./roadmap/INTEGRATION-BLUEPRINT.md)):
+**M1** path render pipeline — `packages/geometry` (lyon), interleaved
+draw plan, mesh cache, frame graph + 4× MSAA, golden nets, dev-only
+fixture corpus (🔨 — design + contracts committed:
+[design/phase8-m1-path-pipeline.md](./design/phase8-m1-path-pipeline.md),
+ADR-032; Phase E opens with the ADR-030 extraction and code-splitting
+precondition commits, the latter recorded as ADR-033 at decision time) ·
+**M2** path model & pen tool — `DocNode` path kind, `.graphite` v2 with
+its migration, path ops (C1.1, C1.4) ·
+**M3** booleans — live non-destructive groups, own evaluation + ADR
+(C1.3) · **M4** text engine core (C4.1–C4.6) · **M5** font management
+(C4.7, C4.8).
 
 ## Performance targets
 
@@ -157,8 +171,8 @@ for React Aria press events). Live (added M5): TanStack Router 1.170
 (ADR-017); Playwright + @axe-core/playwright (dev, E2E + a11y gate).
 Gated (latest versions verified at adoption):
 React Hook Form + Zod → first genuine submission-style form (deferred past
-M5 — Settings is instant-apply; expected P8 account/auth; ADR-016) · TanStack Query, Axum, PostgreSQL, Redis, JWT → **Phase 8** ·
-Yjs → **Phase 9**. Rejected: Next.js / any meta-framework for the editor
+M5 — Settings is instant-apply; expected Phase 11 account/auth; ADR-016) · TanStack Query, Axum, PostgreSQL, Redis, JWT → **Phase 11** ·
+Yjs → **Phase 12** (ADR-029). Rejected: Next.js / any meta-framework for the editor
 ([ADR-012](./adr/ADR-012-no-meta-framework.md)); nightly Rust; Zod for
 internal payloads (hand-rolled `validate.ts`).
 

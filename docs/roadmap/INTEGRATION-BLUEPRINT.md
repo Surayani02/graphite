@@ -490,21 +490,23 @@ All four open questions are settled and recorded:
 
 ### Next deliverable
 
-**Phase 8 M1 — the path render pipeline — through Phases A–D:**
-requirements, architecture, exact file structure, and interface contracts.
-Still no implementation code.
+**Delivered 2026-07-25:**
+[design/phase8-m1-path-pipeline.md](../design/phase8-m1-path-pipeline.md)
+(Phases A–D — requirements, architecture, exact file structure, interface
+contracts) and [ADR-032](../adr/ADR-032-frame-graph-and-mesh-cache.md)
+(frame graph with one 4× MSAA target including export, interleaved render
+list with contiguous-run batching, mesh-handle tessellation boundary,
+bucket/budget/cap mechanics, engine-level fixture corpus behind an
+ADR-027 surface). The three under-scope risks called out at approval are
+all bound in that pair: the frame graph is Decision 2, golden-image
+regression is specified as a two-net strategy (exact Rust mesh snapshots +
+thresholded visual goldens), and code splitting is precondition commit
+PC-2 with its budgets recorded as ADR-033 at Phase-E entry.
 
-Three things land inside M1 that are easy to under-scope and are called out
-now so they are planned, not discovered:
+Of the two prerequisites: the Phase 7 capture is complete (decision 1
+above); the `document-model` extraction (ADR-030) is precondition commit
+PC-1 — the first commit of Phase E, before any feature code, standalone
+and suite-proved as specified.
 
-- **The frame graph.** Two passes into one multisampled target need
-  designed pass ordering and resolve, not an accretion of special cases.
-- **Golden-image visual regression**, before the first path ships.
-- **Code splitting**, which ADR-031 makes a precondition rather than a
-  future lever: ~12 kB of JS headroom does not absorb a tessellator, and
-  WASM growth needs its own budget line alongside ADR-024's ceiling.
-
-Two prerequisites are the caller's, not the architecture's: the Phase 7
-capture must be completed (decision 1), and `packages/document-model`
-should be extracted in a standalone commit (ADR-030) rather than folded
-into a feature milestone.
+**Next: Phase E** — PC-1 extraction → PC-2 code splitting + budget lines →
+geometry crate onward, per the design doc's implementation plan.
