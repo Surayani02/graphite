@@ -9,7 +9,7 @@ import { CommandPalette } from "../features/palette/CommandPalette";
 import { ExportProvider } from "../features/export/useExport";
 import { ExportDialogHost } from "../features/export/ExportDialogHost";
 import { ShortcutProvider } from "../features/shortcuts/ShortcutProvider";
-import { ShortcutRecorderDialog } from "../features/shortcuts/ShortcutRecorderDialog";
+import { ShortcutRecorderDialogHost } from "../features/shortcuts/ShortcutRecorderDialogHost";
 import { ensureBuiltinPanels } from "../features/panels/builtinPanels";
 import { PanelAreaSlot } from "../features/panels/PanelArea";
 
@@ -29,8 +29,10 @@ ensureBuiltinPanels();
  * / footer (status bar). The left and right columns are now
  * <PanelAreaSlot>s — the shell places areas, the registry decides which
  * panels fill them. EngineProvider + ShortcutProvider wrap the shell (this
- * is the editor route "/"); the palette and recorder mount here and render
- * nothing while closed.
+ * is the editor route "/"); the palette mounts here eagerly (it carries a
+ * <50ms open SLO — ADR-033 §2 amendment), while the recorder and export
+ * dialog mount through always-rendered lazy boundaries — nothing while
+ * closed, code in deferred chunks off the gated main bundle (ADR-033).
  */
 export function AppShell() {
   return (
@@ -57,7 +59,7 @@ export function AppShell() {
               <StatusBar />
             </div>
             <CommandPalette />
-            <ShortcutRecorderDialog />
+            <ShortcutRecorderDialogHost />
             <ExportDialogHost />
           </ShortcutProvider>
         </ExportProvider>

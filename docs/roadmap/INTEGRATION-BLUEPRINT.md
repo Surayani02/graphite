@@ -511,6 +511,15 @@ and suite-proved as specified.
 
 **Phase E progress:** PC-1 (`document-model` extraction) ✅ delivered
 2026-07-25 — 543 tests green across four TypeScript packages, bundle
-neutral at 177.61 kB gzip. **Next:** PC-2 — route-level code splitting
-plus the JS/WASM budget lines, recorded as ADR-033 at decision time; then
-the geometry crate onward, per the design doc's implementation plan.
+neutral. PC-2 (startup budgets, ADR-033) ✅ delivered 2026-07-25 — the bundle
+gate now measures the entry's static-import closure (177.71 kB against
+the 190 kB ceiling) so splitting can never satisfy it without deferring;
+three always-rendered lazy islands + `sideEffects` flags establish the
+pattern every future closed-until-invoked surface uses at zero closure
+cost; the palette stays eager under the rule the reference machine
+proved (open-latency SLO ⇒ never an island — a lazy palette measured
+347 ms against the 150 ms e2e gate); and the WASM gate is live in
+capture mode (armed from the measured pre/post-lyon pair at the geometry
+crate). **Next:** the
+geometry crate — `packages/geometry`, lyon behind the mesh-handle
+boundary, Criterion + Rust golden nets (design doc §E, ADR-031/032).
