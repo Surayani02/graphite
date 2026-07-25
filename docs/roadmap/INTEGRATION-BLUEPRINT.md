@@ -537,8 +537,14 @@ cached meshes), `add_path` with a validated flat encoding,
 `geometry_version` as the cache key, the `MeshStore` handle arena
 (monotonic handles, no ABA), and path-reference render records in the
 existing 16-float stride with SDF records byte-identical (ADR-032
-amendment). 114 workspace tests green. **Next:** the worker/GPU half of
-M1 — MSAA targets and the frame graph, the mesh pipeline, the cache and
-its budget scheduler, `buildDrawPlan`, the fixture command, and Net 2's
-visual goldens. ADR-033's WASM ceiling arms from this commit's CI
-measurement (lyon links into the binary here for the first time).
+amendment). 114 workspace tests green. ADR-033's WASM ceiling is **armed at 80 kB gzip** from the
+measured post-integration binary (64.62 kB gzip / 152.14 kB raw).
+
+The worker's **pure seams** ✅ delivered 2026-07-25 — `gpu/drawPlan.ts`
+(contiguous-run batching via `firstInstance`, paint order preserved) and
+`gpu/meshCache.ts` (tolerance buckets, the validity decision matrix, LRU
+with the same-frame guard, and the budgeted repair scheduler), with 26
+Vitest cases covering the §D.5 invariants that need no GPU. **Next:** the
+device-touching half — MSAA targets, the mesh pipeline and shader, frame
+assembly in `gpu/frame.ts`, the DEV fixture command, and Net 2's visual
+goldens.

@@ -134,6 +134,30 @@ written into the script header in that commit). A persistent breach after
 arming is handled the ADR-024 way — recalibrate by ADR with measured
 justification, never by silently editing the number.
 
+**Armed 2026-07-25 — `CEILING_KB = 80`.** Two corrections to the rule
+above, both worth recording rather than quietly absorbing:
+
+1. _Which commit._ The geometry crate did not link lyon into the WASM
+   binary — only the **engine-integration** commit, which added the
+   dependency, did. The post-lyon measurement therefore comes from there:
+   **64.62 kB gzip, 152.14 kB raw**.
+2. _The pair._ Only the post-lyon half was captured. The pre-lyon figure
+   is still recoverable from the CI logs of the PC-2 or geometry commits
+   and is worth recording for the delta, but the ceiling never depended
+   on it: a ceiling is a function of the _current_ size plus a stated
+   allowance, and the pre-lyon number was only ever the interesting half
+   of the story, not an input. Arming was not blocked on it.
+
+The 80 kB figure gives ~24 % headroom. WASM size is deterministic for a
+given toolchain — unlike the JS closure it carries no measurement noise —
+so the margin covers toolchain drift across Rust releases and M2's path
+model, while a heavy new dependency (a text shaper in M4/M5, a boolean
+library in M3) breaches it and forces the ADR conversation. That breach
+is the gate working, not failing. One caveat: the basis is a _local_
+reference build, so the first CI run's figure is the authoritative
+cross-check — the headroom is wide enough to absorb a small toolchain
+difference between the two.
+
 ## Consequences
 
 - The 190 kB ceiling now means what it always claimed to mean: main-thread
