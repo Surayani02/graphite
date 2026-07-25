@@ -1,7 +1,12 @@
 use wasm_bindgen::prelude::*;
 
 use crate::math::{color::Color, rect::Rect};
+use crate::scene::mesh_store::{MeshStore, INVALID_HANDLE};
 use crate::scene::node::{NodeId, NodeKind, SceneNode};
+use graphite_geometry::{
+    bounds as geometry_bounds, tessellate_fill, tessellate_stroke, Contour, FillRule, LineCap,
+    LineJoin, PathGeometry, PathPoint, StrokeStyle,
+};
 
 /// Flat-arena scene graph exposed to JavaScript via wasm-bindgen.
 ///
@@ -38,6 +43,10 @@ pub struct SceneGraph {
     order: Vec<NodeId>,
     next_id: u32,
     count: u32,
+    /// Tessellated meshes the host currently holds handles for
+    /// (ADR-032 §3). Lives on the graph rather than beside it so one
+    /// wasm-bindgen object owns the whole boundary.
+    meshes: MeshStore,
 }
 
 impl Default for SceneGraph {
@@ -57,6 +66,7 @@ impl SceneGraph {
             order: Vec::new(),
             next_id: 0,
             count: 0,
+            meshes: MeshStore::new(),
         }
     }
 
@@ -171,6 +181,17 @@ impl SceneGraph {
                 *stroke = color;
                 *stroke_width = width;
             }
+            NodeKind::Path {
+                stroke: path_stroke,
+                stroke_style,
+                geometry_version,
+                ..
+            } => {
+                *path_stroke = color;
+                stroke_style.width = width;
+                // The stroke mesh is a function of width — invalidate.
+                *geometry_version = geometry_version.saturating_add(1);
+            }
             NodeKind::Frame => {}
         }
     }
@@ -196,6 +217,9 @@ impl SceneGraph {
         match &mut node.kind {
             NodeKind::Rect { fill, .. } => *fill = color,
             NodeKind::Ellipse { fill, .. } => *fill = color,
+            // Fill colour rides the per-draw uniform, not the mesh, so
+            // this deliberately does not bump geometry_version.
+            NodeKind::Path { fill, .. } => *fill = color,
             NodeKind::Frame => {}
         }
     }
@@ -299,6 +323,17 @@ impl SceneGraph {
                         return Some(node.id.0);
                     }
                 }
+                // Control-polygon bounds, not the filled region: exact
+                // path hit-testing arrives with the path *model* in M2,
+                // which is also when a tool can first select one. M1 has
+                // no document path nodes — fixtures live below the
+                // document layer — so a conservative bounds hit is the
+                // honest placeholder rather than a silent `continue`.
+                NodeKind::Path { .. } => {
+                    if node.bounds.contains_point(x, y) {
+                        return Some(node.id.0);
+                    }
+                }
                 NodeKind::Ellipse { .. } => {
                     // Normalised point-in-ellipse: (Δx/rx)² + (Δy/ry)² ≤ 1
                     let cx = node.bounds.x + node.bounds.w * 0.5;
@@ -326,8 +361,19 @@ impl SceneGraph {
         let Some(Some(node)) = self.nodes.get_mut(id as usize) else {
             return;
         };
+        let dx = x - node.bounds.x;
+        let dy = y - node.bounds.y;
         node.bounds.x = x;
         node.bounds.y = y;
+        // Path geometry is node-local (ADR-032 §7): a move shifts the
+        // draw translate and leaves every cached mesh valid.
+        if let NodeKind::Path {
+            origin_x, origin_y, ..
+        } = &mut node.kind
+        {
+            *origin_x += dx;
+            *origin_y += dy;
+        }
     }
 
     /// Returns `[x, y, w, h]` for the node, or an empty slice if the node
@@ -343,6 +389,179 @@ impl SceneGraph {
 
     /// Returns a flat `Float32Array` (16 × f32 = 64 bytes per shape) of every
     /// visible shape that overlaps the viewport.
+    /// Adds a vector path node (Phase 8 M1 — ADR-031/032).
+    ///
+    /// Flat boundary encoding, because wasm-bindgen carries typed arrays
+    /// and not nested structures: `contour_descs` is `[point_count,
+    /// closed]` pairs and `points` is 6 f32 per point in `PathPoint`
+    /// field order (anchor x/y, in-handle x/y, out-handle x/y), contours
+    /// laid end to end. `fill_rule` is 0 = non-zero, 1 = even-odd;
+    /// `cap` is 0 = butt, 1 = round, 2 = square; `join` is 0 = miter,
+    /// 1 = round, 2 = bevel.
+    ///
+    /// `x`/`y` place the geometry's **local** frame in world space
+    /// (ADR-032 §7). Returns the new node id, or `u32::MAX` if the
+    /// encoding is malformed or the geometry has no bounds — a
+    /// classification, never a panic, matching the tessellators.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_path(
+        &mut self,
+        parent: u32,
+        x: f32,
+        y: f32,
+        contour_descs: &[u32],
+        points: &[f32],
+        fill_rule: u8,
+        fill_r: u8,
+        fill_g: u8,
+        fill_b: u8,
+        fill_a: u8,
+        stroke_r: u8,
+        stroke_g: u8,
+        stroke_b: u8,
+        stroke_a: u8,
+        stroke_width: f32,
+        cap: u8,
+        join: u8,
+        miter_limit: f32,
+    ) -> u32 {
+        let Some(geometry) = decode_geometry(contour_descs, points, fill_rule) else {
+            return INVALID_HANDLE;
+        };
+        let Some(local) = geometry_bounds(&geometry) else {
+            return INVALID_HANDLE;
+        };
+
+        let id = self.alloc_id();
+        // f32 carries integers exactly below 2^24, and the render record
+        // ships the id and the version as floats (§B.2). 2^24 is five
+        // orders of magnitude above SYSTEM_MAX_OBJECTS, so this is a
+        // debug assertion rather than a runtime branch.
+        debug_assert!(id.0 < (1 << 24), "node id must stay f32-exact");
+
+        let node = SceneNode {
+            id,
+            kind: NodeKind::Path {
+                geometry,
+                fill: Color {
+                    r: fill_r,
+                    g: fill_g,
+                    b: fill_b,
+                    a: fill_a,
+                },
+                stroke: Color {
+                    r: stroke_r,
+                    g: stroke_g,
+                    b: stroke_b,
+                    a: stroke_a,
+                },
+                stroke_style: StrokeStyle {
+                    width: stroke_width,
+                    cap: decode_cap(cap),
+                    join: decode_join(join),
+                    miter_limit,
+                },
+                origin_x: x,
+                origin_y: y,
+                geometry_version: 1,
+            },
+            // World control-polygon bounds. Stroke inflation is
+            // deliberately excluded, matching every other kind here:
+            // `add_rect` does not widen bounds for its stroke either, so
+            // paths inherit the existing (documented, uniform) culling
+            // convention rather than inventing a second one.
+            bounds: Rect {
+                x: x + local[0],
+                y: y + local[1],
+                w: local[2],
+                h: local[3],
+            },
+            parent: Some(NodeId(parent)),
+            children: Vec::new(),
+        };
+        self.link_child(parent, id);
+        self.store(node);
+        id.0
+    }
+
+    /// Mesh-invalidation counter for a path node: 1 on creation, bumped
+    /// by every geometry- or stroke-affecting edit. Returns 0 for any
+    /// other kind or a missing id, so `0` reads as "not a path".
+    pub fn geometry_version(&self, id: u32) -> u32 {
+        match self.nodes.get(id as usize) {
+            Some(Some(node)) => match &node.kind {
+                NodeKind::Path {
+                    geometry_version, ..
+                } => *geometry_version,
+                _ => 0,
+            },
+            _ => 0,
+        }
+    }
+
+    /// Tessellates one part of a path node and returns a mesh handle
+    /// (ADR-032 §3). `part` is 0 = fill, 1 = stroke. Returns
+    /// `u32::MAX` when the node is missing, is not a path, the part code
+    /// is unknown, or the geometry is degenerate under this request —
+    /// the caller skips the draw.
+    ///
+    /// `tolerance` is in the path's local units; the host derives it
+    /// from the zoom bucket (ADR-032 §4).
+    pub fn tessellate_path(&mut self, id: u32, part: u8, tolerance: f32) -> u32 {
+        let mesh = {
+            let Some(Some(node)) = self.nodes.get(id as usize) else {
+                return INVALID_HANDLE;
+            };
+            let NodeKind::Path {
+                geometry,
+                stroke_style,
+                ..
+            } = &node.kind
+            else {
+                return INVALID_HANDLE;
+            };
+            match part {
+                0 => tessellate_fill(geometry, tolerance),
+                1 => tessellate_stroke(geometry, stroke_style, tolerance),
+                _ => return INVALID_HANDLE,
+            }
+        };
+        match mesh {
+            Ok(mesh) => self.meshes.insert(mesh),
+            Err(_) => INVALID_HANDLE,
+        }
+    }
+
+    /// xy-interleaved positions for a mesh handle, in the path's local
+    /// frame. Empty when the handle is unknown or already freed.
+    pub fn mesh_positions(&self, handle: u32) -> Vec<f32> {
+        self.meshes
+            .get(handle)
+            .map(|mesh| mesh.positions.clone())
+            .unwrap_or_default()
+    }
+
+    /// Triangle-list indices for a mesh handle. Empty when the handle is
+    /// unknown or already freed.
+    pub fn mesh_indices(&self, handle: u32) -> Vec<u32> {
+        self.meshes
+            .get(handle)
+            .map(|mesh| mesh.indices.clone())
+            .unwrap_or_default()
+    }
+
+    /// Releases a mesh handle. Unknown and repeated handles are ignored,
+    /// in the arena's existing silent-tolerance style.
+    pub fn mesh_free(&mut self, handle: u32) {
+        self.meshes.free(handle);
+    }
+
+    /// Number of tessellated meshes the host still holds. Diagnostic:
+    /// a value that grows across idle frames is a host-side leak.
+    pub fn mesh_count(&self) -> u32 {
+        self.meshes.len() as u32
+    }
+
     pub fn get_render_list(
         &self,
         cam_x: f32,
@@ -392,6 +611,25 @@ impl SceneGraph {
                     stroke_width,
                 } => {
                     Self::push_shape(&mut out, node, *fill, *stroke, *stroke_width, 0.0, 1.0);
+                }
+                NodeKind::Path {
+                    fill,
+                    stroke,
+                    stroke_style,
+                    origin_x,
+                    origin_y,
+                    geometry_version,
+                    ..
+                } => {
+                    Self::push_path(
+                        &mut out,
+                        node,
+                        *fill,
+                        *stroke,
+                        stroke_style.width,
+                        (*origin_x, *origin_y),
+                        *geometry_version,
+                    );
                 }
             }
         }
@@ -450,6 +688,121 @@ impl SceneGraph {
         out.push(shape_type);
         out.push(0.0); // pad
     }
+
+    /// Path-reference record (ADR-032 §1). Same 16-float stride as
+    /// [`Self::push_shape`], so SDF records are byte-identical to before
+    /// and the host's storage buffer is unchanged; `shape_type` 2 tells
+    /// the draw planner to emit a mesh draw instead of an SDF instance.
+    ///
+    /// Slot use, and where it diverges from the SDF layout:
+    /// - `0,1` — the node **origin** (the draw translate), not the
+    ///   bounds minimum. The host needs the local frame's world position
+    ///   for the per-draw uniform, and culling already happened here, so
+    ///   spending these two slots on the translate saves a second
+    ///   crossing. ADR-032 §1 sketched the record as carrying bounds;
+    ///   this is the implementation's correction, and the recorded
+    ///   reason for it.
+    /// - `2,3` — world bounds size, for debug overlays.
+    /// - `4..7` fill, `8..11` stroke, `12` stroke width — as SDF.
+    /// - `13` — the engine node id (SDF: corner radius, meaningless here).
+    /// - `14` — shape type, 2.
+    /// - `15` — geometry version (SDF: pad).
+    ///
+    /// The id and version are f32-exact below 2^24; `add_path`
+    /// debug-asserts the id and the version would need 16.7 M edits to
+    /// one node to reach it.
+    fn push_path(
+        out: &mut Vec<f32>,
+        node: &SceneNode,
+        fill: Color,
+        stroke: Color,
+        stroke_width: f32,
+        origin: (f32, f32),
+        geometry_version: u32,
+    ) {
+        out.push(origin.0);
+        out.push(origin.1);
+        out.push(node.bounds.w);
+        out.push(node.bounds.h);
+        out.extend_from_slice(&fill.to_f32_array());
+        out.extend_from_slice(&stroke.to_f32_array());
+        out.push(stroke_width);
+        out.push(node.id.0 as f32);
+        out.push(2.0);
+        out.push(geometry_version as f32);
+    }
+}
+
+// ── Flat-encoding decoders ────────────────────────────────────────────────────
+
+/// Rebuilds a [`PathGeometry`] from the flat wasm-bindgen encoding.
+/// Returns `None` when the description and payload disagree — a wrong
+/// length, a contour shorter than two points, or trailing bytes — so a
+/// malformed host call is rejected rather than silently truncated.
+fn decode_geometry(contour_descs: &[u32], points: &[f32], fill_rule: u8) -> Option<PathGeometry> {
+    if contour_descs.is_empty() || !contour_descs.len().is_multiple_of(2) {
+        return None;
+    }
+    let mut contours = Vec::with_capacity(contour_descs.len() / 2);
+    let mut cursor = 0usize;
+    for desc in contour_descs.chunks_exact(2) {
+        let count = desc[0] as usize;
+        if count < 2 {
+            return None;
+        }
+        let end = cursor.checked_add(count.checked_mul(6)?)?;
+        if end > points.len() {
+            return None;
+        }
+        let mut pts = Vec::with_capacity(count);
+        for p in points[cursor..end].chunks_exact(6) {
+            pts.push(PathPoint {
+                x: p[0],
+                y: p[1],
+                h_in_x: p[2],
+                h_in_y: p[3],
+                h_out_x: p[4],
+                h_out_y: p[5],
+            });
+        }
+        contours.push(Contour {
+            closed: desc[1] != 0,
+            points: pts,
+        });
+        cursor = end;
+    }
+    if cursor != points.len() {
+        return None;
+    }
+    Some(PathGeometry {
+        contours,
+        fill_rule: if fill_rule == 1 {
+            FillRule::EvenOdd
+        } else {
+            FillRule::NonZero
+        },
+    })
+}
+
+/// Unknown codes fall back to the CSS/SVG initial value rather than
+/// failing the whole call: a cap code is cosmetic, and rejecting a path
+/// over one would be a worse failure mode than drawing a butt cap.
+fn decode_cap(code: u8) -> LineCap {
+    match code {
+        1 => LineCap::Round,
+        2 => LineCap::Square,
+        _ => LineCap::Butt,
+    }
+}
+
+/// Unknown codes fall back to miter, the CSS/SVG initial value — see
+/// [`decode_cap`].
+fn decode_join(code: u8) -> LineJoin {
+    match code {
+        1 => LineJoin::Round,
+        2 => LineJoin::Bevel,
+        _ => LineJoin::Miter,
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -457,6 +810,238 @@ impl SceneGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Path nodes (Phase 8 M1) ──────────────────────────────────────────────
+
+    /// Encodes one closed triangle at the given local offset: the flat
+    /// (`contour_descs`, `points`) pair `add_path` expects.
+    fn triangle_encoding() -> (Vec<u32>, Vec<f32>) {
+        let corners = [(0.0f32, 0.0f32), (120.0, 0.0), (0.0, 90.0)];
+        let mut points = Vec::with_capacity(18);
+        for (x, y) in corners {
+            points.extend_from_slice(&[x, y, x, y, x, y]);
+        }
+        (vec![3, 1], points)
+    }
+
+    fn add_triangle(g: &mut SceneGraph, x: f32, y: f32) -> u32 {
+        let frame = g.add_frame(0.0, 0.0, 10_000.0, 10_000.0);
+        let (descs, points) = triangle_encoding();
+        g.add_path(
+            frame, x, y, &descs, &points, 0, 10, 20, 30, 255, 0, 0, 0, 0, 0.0, 0, 0, 4.0,
+        )
+    }
+
+    #[test]
+    fn add_path_stores_world_bounds_and_starts_at_version_one() {
+        let mut g = SceneGraph::new();
+        let id = add_triangle(&mut g, 50.0, 70.0);
+        assert_ne!(id, INVALID_HANDLE);
+        assert_eq!(g.get_node_bounds(id), vec![50.0, 70.0, 120.0, 90.0]);
+        assert_eq!(g.geometry_version(id), 1);
+    }
+
+    #[test]
+    fn geometry_version_is_zero_for_non_paths_and_missing_ids() {
+        let mut g = SceneGraph::new();
+        let frame = g.add_frame(0.0, 0.0, 100.0, 100.0);
+        let rect = g.add_rect(frame, 0.0, 0.0, 10.0, 10.0, 1, 2, 3, 4);
+        assert_eq!(g.geometry_version(rect), 0);
+        assert_eq!(g.geometry_version(frame), 0);
+        assert_eq!(g.geometry_version(9_999), 0);
+    }
+
+    #[test]
+    fn add_path_rejects_malformed_encodings() {
+        let mut g = SceneGraph::new();
+        let frame = g.add_frame(0.0, 0.0, 100.0, 100.0);
+        let (_descs, points) = triangle_encoding();
+        let bad: [(&[u32], &[f32]); 5] = [
+            (&[], &points),           // no contours
+            (&[3], &points),          // odd desc length
+            (&[1, 1], &points[..6]),  // contour shorter than two points
+            (&[3, 1], &points[..12]), // payload too short
+            (&[2, 1], &points),       // payload longer than described
+        ];
+        for (d, pts) in bad {
+            let id = g.add_path(
+                frame, 0.0, 0.0, d, pts, 0, 1, 2, 3, 4, 0, 0, 0, 0, 0.0, 0, 0, 4.0,
+            );
+            assert_eq!(id, INVALID_HANDLE, "descs {d:?} / {} floats", pts.len());
+        }
+        assert_eq!(g.node_count(), 1, "no partial node may be stored");
+    }
+
+    #[test]
+    fn moving_a_path_shifts_its_origin_and_leaves_geometry_untouched() {
+        let mut g = SceneGraph::new();
+        let id = add_triangle(&mut g, 50.0, 70.0);
+        let before = g.geometry_version(id);
+        g.set_node_position(id, 250.0, 170.0);
+
+        assert_eq!(g.get_node_bounds(id), vec![250.0, 170.0, 120.0, 90.0]);
+        assert_eq!(
+            g.geometry_version(id),
+            before,
+            "a move must not invalidate cached meshes (ADR-032 §7)"
+        );
+        let list = g.get_render_list(300.0, 200.0, 1.0, 1920.0, 1080.0);
+        assert_eq!(
+            (list[0], list[1]),
+            (250.0, 170.0),
+            "record carries the translate"
+        );
+    }
+
+    #[test]
+    fn stroke_changes_bump_the_version_but_fill_changes_do_not() {
+        let mut g = SceneGraph::new();
+        let id = add_triangle(&mut g, 0.0, 0.0);
+        g.set_fill(id, 9, 9, 9, 255);
+        assert_eq!(g.geometry_version(id), 1, "fill rides the uniform");
+        g.set_stroke(id, 1, 2, 3, 255, 6.0);
+        assert_eq!(g.geometry_version(id), 2, "stroke width reshapes the mesh");
+    }
+
+    #[test]
+    fn render_list_path_record_layout() {
+        let mut g = SceneGraph::new();
+        let id = add_triangle(&mut g, 50.0, 70.0);
+        let list = g.get_render_list(100.0, 100.0, 1.0, 1920.0, 1080.0);
+        assert_eq!(list.len(), 16, "one path record, one 16-float stride");
+        assert_eq!(&list[0..4], &[50.0, 70.0, 120.0, 90.0]);
+        assert_eq!(list[4], 10.0 / 255.0, "fill r");
+        assert_eq!(list[13], id as f32, "engine id");
+        assert_eq!(list[14], 2.0, "shape_type 2 = path reference");
+        assert_eq!(list[15], 1.0, "geometry version");
+    }
+
+    #[test]
+    fn sdf_records_are_unchanged_by_the_path_variant() {
+        let mut g = SceneGraph::new();
+        let frame = g.add_frame(0.0, 0.0, 10_000.0, 10_000.0);
+        let rect = g.add_rect(frame, 10.0, 20.0, 30.0, 40.0, 1, 2, 3, 255);
+        g.set_corner_radius(rect, 5.0);
+        let list = g.get_render_list(0.0, 0.0, 1.0, 1920.0, 1080.0);
+        assert_eq!(&list[0..4], &[10.0, 20.0, 30.0, 40.0]);
+        assert_eq!(list[13], 5.0, "slot 13 is still corner radius for SDF");
+        assert_eq!(list[14], 0.0);
+        assert_eq!(list[15], 0.0, "slot 15 is still pad for SDF");
+    }
+
+    #[test]
+    fn paths_keep_paint_order_between_sdf_shapes() {
+        let mut g = SceneGraph::new();
+        let frame = g.add_frame(0.0, 0.0, 10_000.0, 10_000.0);
+        let (descs, points) = triangle_encoding();
+        g.add_rect(frame, 0.0, 0.0, 50.0, 50.0, 1, 1, 1, 255);
+        g.add_path(
+            frame, 0.0, 0.0, &descs, &points, 0, 2, 2, 2, 255, 0, 0, 0, 0, 0.0, 0, 0, 4.0,
+        );
+        g.add_rect(frame, 0.0, 0.0, 50.0, 50.0, 3, 3, 3, 255);
+
+        let list = g.get_render_list(0.0, 0.0, 1.0, 1920.0, 1080.0);
+        let kinds: Vec<f32> = list.chunks_exact(16).map(|r| r[14]).collect();
+        assert_eq!(
+            kinds,
+            vec![0.0, 2.0, 0.0],
+            "interleaving follows paint order"
+        );
+    }
+
+    #[test]
+    fn tessellate_path_round_trips_through_a_handle() {
+        let mut g = SceneGraph::new();
+        let id = add_triangle(&mut g, 0.0, 0.0);
+
+        let fill = g.tessellate_path(id, 0, 0.25);
+        assert_ne!(fill, INVALID_HANDLE);
+        let positions = g.mesh_positions(fill);
+        let indices = g.mesh_indices(fill);
+        assert_eq!(positions.len(), 6, "a triangle tessellates to 3 vertices");
+        assert_eq!(indices.len(), 3);
+        assert_eq!(g.mesh_count(), 1);
+
+        g.mesh_free(fill);
+        assert_eq!(g.mesh_count(), 0);
+        assert!(
+            g.mesh_positions(fill).is_empty(),
+            "freed handle reads empty"
+        );
+        assert!(g.mesh_indices(fill).is_empty());
+    }
+
+    #[test]
+    fn tessellate_path_rejects_bad_requests_without_leaking() {
+        let mut g = SceneGraph::new();
+        let id = add_triangle(&mut g, 0.0, 0.0);
+        let frame_id = 0u32;
+        assert_eq!(
+            g.tessellate_path(id, 7, 0.25),
+            INVALID_HANDLE,
+            "unknown part"
+        );
+        assert_eq!(
+            g.tessellate_path(id, 0, 0.0),
+            INVALID_HANDLE,
+            "bad tolerance"
+        );
+        assert_eq!(
+            g.tessellate_path(frame_id, 0, 0.25),
+            INVALID_HANDLE,
+            "not a path"
+        );
+        assert_eq!(
+            g.tessellate_path(9_999, 0, 0.25),
+            INVALID_HANDLE,
+            "missing id"
+        );
+        // The zero-width stroke of this fixture has no ink.
+        assert_eq!(
+            g.tessellate_path(id, 1, 0.25),
+            INVALID_HANDLE,
+            "degenerate stroke"
+        );
+        assert_eq!(g.mesh_count(), 0, "no failed request may retain a mesh");
+    }
+
+    #[test]
+    fn stroke_tessellates_once_a_width_is_set() {
+        let mut g = SceneGraph::new();
+        let id = add_triangle(&mut g, 0.0, 0.0);
+        g.set_stroke(id, 0, 0, 0, 255, 4.0);
+        let handle = g.tessellate_path(id, 1, 0.25);
+        assert_ne!(handle, INVALID_HANDLE);
+        assert!(!g.mesh_indices(handle).is_empty());
+        g.mesh_free(handle);
+    }
+
+    #[test]
+    fn removing_a_path_node_keeps_the_scene_consistent() {
+        let mut g = SceneGraph::new();
+        let id = add_triangle(&mut g, 0.0, 0.0);
+        assert_eq!(g.node_count(), 2);
+        assert!(g.remove_node(id));
+        assert_eq!(g.node_count(), 1);
+        assert!(g.get_render_list(0.0, 0.0, 1.0, 1920.0, 1080.0).is_empty());
+        assert_eq!(g.geometry_version(id), 0);
+    }
+
+    #[test]
+    fn culled_paths_emit_no_record() {
+        let mut g = SceneGraph::new();
+        add_triangle(&mut g, 50_000.0, 50_000.0);
+        let list = g.get_render_list(0.0, 0.0, 1.0, 1920.0, 1080.0);
+        assert!(list.is_empty(), "off-screen path must be culled");
+    }
+
+    #[test]
+    fn hit_test_finds_a_path_by_its_bounds() {
+        let mut g = SceneGraph::new();
+        let id = add_triangle(&mut g, 50.0, 70.0);
+        assert_eq!(g.hit_test(60.0, 80.0), Some(id));
+        assert_eq!(g.hit_test(49.0, 69.0), None);
+    }
 
     fn wide_cam() -> (f32, f32, f32, f32, f32) {
         (500.0, 400.0, 1.0, 1920.0, 1080.0)

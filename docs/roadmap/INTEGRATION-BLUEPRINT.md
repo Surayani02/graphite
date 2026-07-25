@@ -531,8 +531,14 @@ Criterion benches run in CI's quick pass, and their ten `ceilings.json`
 entries are **armed from the 2026-07-25 reference capture** (ADR-023):
 the recorded 1k-segment target of <4 ms measures **152.42 µs**, a ~26×
 margin. Golden portability is CI-enforced on Windows as well as Linux
-after two measured libm drifts (ADR-032 amendment). **Next:** engine
-integration — `NodeKind::Path`, `add_path`, the mesh-handle arena
-(§B.5), path-reference render records — which is also the commit where
-lyon first links into the WASM binary and therefore where ADR-033's
-WASM ceiling is armed from the measured pre/post pair.
+after two measured libm drifts (ADR-032 amendment). **Engine integration** ✅ delivered 2026-07-25 —
+`NodeKind::Path` (node-local geometry + world origin, so a move reuses
+cached meshes), `add_path` with a validated flat encoding,
+`geometry_version` as the cache key, the `MeshStore` handle arena
+(monotonic handles, no ABA), and path-reference render records in the
+existing 16-float stride with SDF records byte-identical (ADR-032
+amendment). 114 workspace tests green. **Next:** the worker/GPU half of
+M1 — MSAA targets and the frame graph, the mesh pipeline, the cache and
+its budget scheduler, `buildDrawPlan`, the fixture command, and Net 2's
+visual goldens. ADR-033's WASM ceiling arms from this commit's CI
+measurement (lyon links into the binary here for the first time).

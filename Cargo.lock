@@ -254,6 +254,7 @@ name = "graphite-engine"
 version = "0.1.0"
 dependencies = [
  "criterion",
+ "graphite-geometry",
  "wasm-bindgen",
 ]
 

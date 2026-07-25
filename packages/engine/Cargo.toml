@@ -8,11 +8,26 @@ description = "Graphite graphics engine (Rust → WASM)"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-# Tell wasm-opt to accept bulk-memory instructions that Rust 1.96+ generates
+# wasm-opt runs against an explicit feature allowlist rather than `-all`,
+# so the Wasm features this binary depends on stay a deliberate, reviewable
+# decision: a new dependency cannot quietly introduce threads, SIMD, or GC
+# without this line changing and someone checking browser reach.
+#
+#   bulk-memory              Rust's wasm codegen emits it (Phase 1).
+#   nontrapping-float-to-int lyon's float→int casts. Rust's `as` casts
+#                            saturate, which lowers to `i32.trunc_sat_*`;
+#                            these first appear in the binary in Phase 8 M1,
+#                            when graphite-geometry linked in, and wasm-opt
+#                            rejects the module without the feature enabled.
+#
+# Both features predate every WebGPU-capable browser by years (Chrome 75 /
+# Firefox 64 / Safari 15, against WebGPU's Chrome 113 / Safari 18), so the
+# allowlist costs no reach.
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-O", "--enable-bulk-memory"]
+wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
 
 [dependencies]
+graphite-geometry = { workspace = true }
 wasm-bindgen = "0.2"
 
 [dev-dependencies]
