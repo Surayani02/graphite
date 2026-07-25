@@ -520,6 +520,19 @@ cost; the palette stays eager under the rule the reference machine
 proved (open-latency SLO ⇒ never an island — a lazy palette measured
 347 ms against the 150 ms e2e gate); and the WASM gate is live in
 capture mode (armed from the measured pre/post-lyon pair at the geometry
-crate). **Next:** the
-geometry crate — `packages/geometry`, lyon behind the mesh-handle
-boundary, Criterion + Rust golden nets (design doc §E, ADR-031/032).
+crate). The
+**geometry crate** ✅ delivered 2026-07-25 — `graphite-geometry` in the
+Cargo workspace: §D.1 types, lyon fill/stroke behind the crate boundary
+(component crates pinned; no `lyon_algorithms` until C1.15's dashes),
+cull-grade bounds, the ADR-032 §5 corpus, 25 unit tests + determinism +
+bounds-containment properties, and golden Net 1 (ten `.snap` files
+generated from real tessellator output, `GOLDEN_UPDATE=1` regeneration).
+Criterion benches run in CI's quick pass, and their ten `ceilings.json`
+entries are **armed from the 2026-07-25 reference capture** (ADR-023):
+the recorded 1k-segment target of <4 ms measures **152.42 µs**, a ~26×
+margin. Golden portability is CI-enforced on Windows as well as Linux
+after two measured libm drifts (ADR-032 amendment). **Next:** engine
+integration — `NodeKind::Path`, `add_path`, the mesh-handle arena
+(§B.5), path-reference render records — which is also the commit where
+lyon first links into the WASM binary and therefore where ADR-033's
+WASM ceiling is armed from the measured pre/post pair.

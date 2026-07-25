@@ -122,6 +122,17 @@ lie in the document model.
   goldens (SwiftShader WebGPU) as the integration net, with a loud,
   annotated skip plus a reference-machine procedure if CI cannot produce
   an adapter — recorded, never silent.
+- **Amendment (2026-07-25, geometry commit).** Net 1's exactness has a
+  precondition this ADR did not state: _nothing upstream of a hashed byte
+  may call libm_. Two cross-platform drifts proved it on the maintainer's
+  Windows machine — round-join trig inside the tessellated style, then
+  the fixture generator's own `cos`/`sin` — both at identical vertex and
+  index counts. Hashes are therefore taken over a trig-free stroke style
+  and libm-free fixture generation (`corpus::unit_dir`: half-angle
+  descent plus binary rotation exponentiation, `sqrt` and arithmetic
+  only), with round-arc geometry held by counts-only snapshot lines and
+  by Net 2's thresholds. A `windows-2025` CI job now runs the golden
+  suite so this class fails in CI rather than by hand.
 - Two new CI gates arrive with implementation: `geometry` Criterion
   ceilings in `benchmarks/ceilings.json` (measured basis, ADR-023
   discipline) and the WASM size budget whose ceiling ADR-033 sets from the

@@ -160,6 +160,31 @@ jobs:
           path: apps/web/playwright-report/
           retention-days: 7
 
+  # Phase 8 M1: the golden net's hashes must be bit-identical across
+  # platforms, and Linux-only CI cannot prove that — two cross-platform
+  # drifts (libm round joins, then libm anchor generation) were found by
+  # hand on the maintainer's Windows machine instead. This job moves that
+  # discovery into CI. Geometry crate only: it is the sole hash-bearing
+  # suite, so the job stays ~2 minutes.
+  geometry-goldens-windows:
+    name: Geometry goldens (Windows)
+    runs-on: windows-2025
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Golden net (portability)
+        run: cargo test -p graphite-geometry --test golden
+
   rust:
     name: Rust
     runs-on: ubuntu-24.04
@@ -213,4 +238,5 @@ jobs:
       - name: Bench (quick) + ceilings gate
         run: |
           cargo bench -p graphite-engine --bench engine -- --warm-up-time 0.5 --measurement-time 1 --sample-size 10
+          cargo bench -p graphite-geometry --bench geometry -- --warm-up-time 0.5 --measurement-time 1 --sample-size 10
           node scripts/check-bench-ceilings.mjs

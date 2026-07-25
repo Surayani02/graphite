@@ -3,6 +3,7 @@ members  = [
     "apps/server",
     "packages/engine",
     "packages/document",
+    "packages/geometry",
 ]
 resolver = "2"
 
@@ -18,6 +19,10 @@ serde      = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow     = "1.0"
 thiserror  = "2.0"
+# lyon component crates, not the `lyon` umbrella: the umbrella pulls
+# lyon_algorithms, which is the M2+ dash dependency (ADR-032), not M1's.
+lyon_path         = "1.0"
+lyon_tessellation = "1.0"
 
 # ── Build profiles ─────────────────────────────────────────────────────────
 [profile.dev]

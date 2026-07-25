@@ -53,6 +53,7 @@ graphite/
 ├── packages/
 │   ├── protocol       Shared TypeScript types (IPC + network schema)
 │   ├── engine         Rust graphics engine → WASM
+│   ├── geometry       Path tessellation (lyon) — internal engine crate
 │   ├── document       Placeholder — see docs/adr/ADR-010
 │   ├── document-model Document model + .graphite format (ADR-030)
 │   ├── crdt           CRDT collaboration (Phase 12)
