@@ -1,0 +1,6 @@
+fill tol=0.25 v=3 i=3 hash=4de3ebc3bdcd15bf
+stroke tol=0.25 v=8 i=18 hash=0e2bea798cb9083c
+stroke_round tol=0.25 v=18 i=48
+fill tol=0.015625 v=3 i=3 hash=4de3ebc3bdcd15bf
+stroke tol=0.015625 v=8 i=18 hash=0e2bea798cb9083c
+stroke_round tol=0.015625 v=32 i=90

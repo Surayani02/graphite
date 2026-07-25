@@ -1,0 +1,6 @@
+fill tol=0.25 v=10 i=24 hash=56c411ad615fccce
+stroke tol=0.25 v=12 i=30 hash=a4d62ea80d76b1ff
+stroke_round tol=0.25 v=32 i=90
+fill tol=0.015625 v=10 i=24 hash=56c411ad615fccce
+stroke tol=0.015625 v=12 i=30 hash=a4d62ea80d76b1ff
+stroke_round tol=0.015625 v=52 i=150
