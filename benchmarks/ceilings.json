@@ -1,5 +1,5 @@
 {
-  "_comment": "Absolute CI bench ceilings (ADR-023). Deliberately generous — shared GitHub runners are noisy; this gate catches order-of-magnitude regressions, not single-digit-percent drift, which the reference-machine Criterion history tracks instead. Every entry records its derivation so recalibration is an evidence exercise. Recalibrated 2026-07-16 from Surajit's first full (non-quick) reference-machine run of the M3 bench suite — all ten entries are now measured, none analytical.",
+  "_comment": "Absolute CI bench ceilings (ADR-023). Deliberately generous — shared GitHub runners are noisy; this gate catches order-of-magnitude regressions, not single-digit-percent drift, which the reference-machine Criterion history tracks instead. Every entry records its derivation so recalibration is an evidence exercise. Recalibrated 2026-07-16 from Surajit's first full (non-quick) reference-machine run of the M3 bench suite — all ten entries are now measured, none analytical. Phase 8 M1 (2026-07-25): ten geometry::* entries added from Surajit's full reference run of the frozen v3 corpus fixture — all measured, none analytical. Criterion's own change-detection was meaningless for that run (the fixture was deliberately rescaled between captures), which is exactly why this gate compares against recorded absolute ceilings rather than a rolling baseline.",
   "scene_graph::insert_shapes/10000": {
     "ceiling_ns": 2700000,
     "basis": "375.47 µs, 2026-07-16 reference run × ~7 CI margin. Up from the pre-M3 352 µs baseline — every insert now also pushes the new paint-order Vec (store()); the ~23 µs/10k delta is that cost, architecturally required for M3's order-exact undo."
@@ -39,5 +39,45 @@
   "scene_graph::move_node_to_index_10k": {
     "ceiling_ns": 800000,
     "basis": "MEASURED 114.16 µs, 2026-07-16 reference run × ~7 CI margin. Worst case: linear search (O(n) position()) + two O(n) shifts (remove + insert) on a 10k-element Vec — three passes, consistent with the measurement."
+  },
+  "geometry::fill_blob/64": {
+    "ceiling_ns": 350000,
+    "basis": "32.089 µs, 2026-07-25 reference run × ~11 CI margin"
+  },
+  "geometry::fill_blob/256": {
+    "ceiling_ns": 750000,
+    "basis": "70.771 µs, 2026-07-25 reference run × ~10.6 CI margin"
+  },
+  "geometry::fill_blob/1024": {
+    "ceiling_ns": 1300000,
+    "basis": "152.42 µs, 2026-07-25 reference run × ~8.5 CI margin. The <4 ms 1k-segment tessellation target (design doc §3) is met with ~26× headroom on the reference machine."
+  },
+  "geometry::stroke_blob/64": {
+    "ceiling_ns": 300000,
+    "basis": "27.888 µs, 2026-07-25 reference run × ~10.8 CI margin"
+  },
+  "geometry::stroke_blob/256": {
+    "ceiling_ns": 700000,
+    "basis": "65.539 µs, 2026-07-25 reference run × ~10.7 CI margin"
+  },
+  "geometry::stroke_blob/1024": {
+    "ceiling_ns": 1300000,
+    "basis": "160.43 µs, 2026-07-25 reference run × ~8.1 CI margin"
+  },
+  "geometry::fill_star_evenodd": {
+    "ceiling_ns": 45000,
+    "basis": "2.8213 µs, 2026-07-25 reference run × ~16 CI margin. Self-intersection overhead: five crossings on ten vertices, so this is sweep-line bookkeeping cost, not flattening."
+  },
+  "geometry::fill_long_cubic/1": {
+    "ceiling_ns": 80000,
+    "basis": "4.9325 µs, 2026-07-25 reference run × ~16 CI margin"
+  },
+  "geometry::fill_long_cubic/0.25": {
+    "ceiling_ns": 130000,
+    "basis": "8.2797 µs, 2026-07-25 reference run × ~15.7 CI margin"
+  },
+  "geometry::fill_long_cubic/0.015625": {
+    "ceiling_ns": 350000,
+    "basis": "31.337 µs, 2026-07-25 reference run × ~11.2 CI margin. The 1 → 0.25 → 0.0156 rows are the tolerance-sensitivity guard: flattening cost must scale with the bucket, which is the mesh cache's whole premise (ADR-032 §4)."
   }
 }
