@@ -1,4 +1,5 @@
 import { SHADER_WGSL } from "./shader";
+import { MSAA_SAMPLE_COUNT } from "./targets";
 
 /**
  * Compiles the shape shader and constructs the render pipeline.
@@ -44,5 +45,10 @@ export async function buildPipeline(
     vertex: { module: shaderModule, entryPoint: "vs" },
     fragment: { module: shaderModule, entryPoint: "fs", targets: [{ format, blend }] },
     primitive: { topology: "triangle-list", cullMode: "none" },
+    // Every pipeline that shares the frame's colour target must declare
+    // the same sample count (ADR-032 §2). This applies to the export
+    // pipeline too — which is how export parity is enforced by the API
+    // rather than by discipline.
+    multisample: { count: MSAA_SAMPLE_COUNT },
   });
 }

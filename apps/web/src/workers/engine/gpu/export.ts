@@ -2,6 +2,7 @@ import type { Color, RasterFormat } from "@graphite/protocol";
 import type { EngineState } from "../state";
 import { contentBounds, fitCamera } from "../../../features/export/bounds";
 import { buildPipeline } from "./pipeline";
+import { createMsaaTarget, msaaAttachment } from "./targets";
 import { updateCameraUniform, uploadRenderList, rebuildMainBindGroup } from "./buffers";
 
 /**
@@ -112,19 +113,20 @@ async function renderToRgba(state: EngineState, scale: number): Promise<Raster> 
       usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     });
 
+    // Export renders through the same 4× MSAA configuration as the screen
+    // (ADR-032 §2), so an exported raster matches what the user saw. This
+    // is not a convention anyone has to remember: the shared pipeline
+    // declares `multisample.count`, and WebGPU rejects a pass whose
+    // attachment sample count disagrees — parity is enforced by the API.
+    const msaa = createMsaaTarget(device, "rgba8unorm", width, height, "export-msaa");
     const encoder = device.createCommandEncoder({ label: "export-encoder" });
     const pass = encoder.beginRenderPass({
       label: "export-pass",
       colorAttachments: [
-        {
-          view: target.createView(),
-          // Transparent clear: PNG keeps it; JPEG flattening happens at
-          // encode time against the caller's background, so the raster
-          // itself is always the honest alpha-correct image.
-          clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          loadOp: "clear",
-          storeOp: "store",
-        },
+        // Transparent clear: PNG keeps it; JPEG flattening happens at
+        // encode time against the caller's background, so the raster
+        // itself is always the honest alpha-correct image.
+        msaaAttachment(msaa, target.createView(), { r: 0, g: 0, b: 0, a: 0 }),
       ],
     });
     pass.setPipeline(pipeline);
@@ -144,6 +146,7 @@ async function renderToRgba(state: EngineState, scale: number): Promise<Raster> 
     const rgba = unpadRows(padded, width, height, bytesPerRow);
     readback.unmap();
     readback.destroy();
+    msaa.texture.destroy();
     target.destroy();
 
     return { width, height, rgba };

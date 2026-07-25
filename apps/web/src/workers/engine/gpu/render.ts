@@ -2,6 +2,7 @@ import { FRAME_BUDGET_MS } from "@graphite/protocol";
 import type { EngineState } from "../state";
 import { post } from "../messaging";
 import { updateCameraUniform, uploadRenderList, updateSelectionBuffer } from "./buffers";
+import { renderFrame } from "./frame";
 
 /**
  * QUAL-02: the render loop reschedules itself every frame via a recursive
@@ -45,38 +46,6 @@ function scheduleAfter(delayMs: number, cb: () => void): void {
   } else {
     scheduleImmediate(cb);
   }
-}
-
-/** Encodes and submits one frame. Returns wall-clock GPU-submit time in ms. */
-export function renderFrame(state: EngineState): number {
-  if (!state.gpuDevice || !state.gpuContext || !state.gpuPipeline || !state.bindGroup) return 0;
-
-  const t0 = performance.now();
-  const encoder = state.gpuDevice.createCommandEncoder({ label: "frame-encoder" });
-  const pass = encoder.beginRenderPass({
-    label: "main-pass",
-    colorAttachments: [
-      {
-        view: state.gpuContext.getCurrentTexture().createView(),
-        clearValue: { r: 0.059, g: 0.063, b: 0.086, a: 1.0 }, // #0f1016
-        loadOp: "clear",
-        storeOp: "store",
-      },
-    ],
-  });
-
-  pass.setPipeline(state.gpuPipeline);
-  pass.setBindGroup(0, state.bindGroup);
-  pass.draw(6, state.shapeCount); // 6 verts × N instances
-
-  if (state.selectedId !== null && state.selectionBG) {
-    pass.setBindGroup(0, state.selectionBG);
-    pass.draw(6, 1);
-  }
-
-  pass.end();
-  state.gpuDevice.queue.submit([encoder.finish()]);
-  return performance.now() - t0;
 }
 
 /**
