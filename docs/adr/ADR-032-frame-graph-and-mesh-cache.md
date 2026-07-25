@@ -140,3 +140,16 @@ lie in the document model.
 - The f32 id/version encoding caps both at 2^24 − 1. Documented and
   debug-asserted; revisiting it means widening the record stride, which
   this ADR's layout leaves eight reserved floats to absorb.
+- **Amendment (2026-07-25, engine-integration commit).** Decision 1
+  sketched the path record as `[bounds, 2, id, version, zeros]`. The
+  implementation instead reuses the existing 16-float stride's _free_
+  slots — id at 13 (SDF: corner radius), type at 14, version at 15 (SDF:
+  pad), fill/stroke/width where SDF already carries them — so SDF
+  records stay byte-identical and the host's storage buffer needs no
+  change at all, which was the point of Decision 1. Slots 0–1 carry the
+  node **origin** rather than the bounds minimum: culling happens in
+  Rust, so the host's only spatial need is the per-draw translate
+  (Decision 4's uniform), and spending those slots on it removes a
+  second crossing. Bounds size stays at 2–3 for debug overlays. Path
+  bounds exclude stroke inflation, matching `add_rect`'s existing
+  convention rather than introducing a second one.

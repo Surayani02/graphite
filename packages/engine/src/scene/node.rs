@@ -1,4 +1,5 @@
 use crate::math::{color::Color, rect::Rect};
+use graphite_geometry::{PathGeometry, StrokeStyle};
 
 /// Opaque, arena-stable node identifier.
 /// The inner `u32` is the index into `SceneGraph::nodes`.
@@ -30,6 +31,34 @@ pub enum NodeKind {
         fill: Color,
         stroke: Color,
         stroke_width: f32,
+    },
+
+    /// Arbitrary vector path — Phase 8 M1 (ADR-031/032).
+    ///
+    /// Rendered through tessellated meshes rather than the SDF pipeline,
+    /// so the fields the SDF shader reads (`corner_radius`) have no
+    /// analogue here.
+    ///
+    /// `geometry` is in **node-local** coordinates and `origin` places
+    /// that frame in world space: a move updates `origin` only, so cached
+    /// meshes survive it (ADR-032 §7). `bounds` (on [`SceneNode`]) stays
+    /// the world-space control-polygon rectangle used for culling and
+    /// hit-testing.
+    ///
+    /// `geometry_version` starts at 1 and increments on every edit that
+    /// invalidates a tessellated mesh — the host's cache key (ADR-032 §4).
+    /// It is deliberately bumped by stroke-parameter changes too: the
+    /// stroke mesh depends on width, cap, join, and miter limit, and one
+    /// conservative counter is cheaper to reason about than per-part
+    /// versioning, which M3's boolean groups would have to keep in step.
+    Path {
+        geometry: PathGeometry,
+        fill: Color,
+        stroke: Color,
+        stroke_style: StrokeStyle,
+        origin_x: f32,
+        origin_y: f32,
+        geometry_version: u32,
     },
 }
 

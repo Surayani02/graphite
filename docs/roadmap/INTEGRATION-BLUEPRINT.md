@@ -531,8 +531,20 @@ Criterion benches run in CI's quick pass, and their ten `ceilings.json`
 entries are **armed from the 2026-07-25 reference capture** (ADR-023):
 the recorded 1k-segment target of <4 ms measures **152.42 µs**, a ~26×
 margin. Golden portability is CI-enforced on Windows as well as Linux
-after two measured libm drifts (ADR-032 amendment). **Next:** engine
-integration — `NodeKind::Path`, `add_path`, the mesh-handle arena
-(§B.5), path-reference render records — which is also the commit where
-lyon first links into the WASM binary and therefore where ADR-033's
-WASM ceiling is armed from the measured pre/post pair.
+after two measured libm drifts (ADR-032 amendment). **Engine integration** ✅ delivered 2026-07-25 —
+`NodeKind::Path` (node-local geometry + world origin, so a move reuses
+cached meshes), `add_path` with a validated flat encoding,
+`geometry_version` as the cache key, the `MeshStore` handle arena
+(monotonic handles, no ABA), and path-reference render records in the
+existing 16-float stride with SDF records byte-identical (ADR-032
+amendment). 114 workspace tests green. ADR-033's WASM ceiling is **armed at 80 kB gzip** from the
+measured post-integration binary (64.62 kB gzip / 152.14 kB raw).
+
+The worker's **pure seams** ✅ delivered 2026-07-25 — `gpu/drawPlan.ts`
+(contiguous-run batching via `firstInstance`, paint order preserved) and
+`gpu/meshCache.ts` (tolerance buckets, the validity decision matrix, LRU
+with the same-frame guard, and the budgeted repair scheduler), with 26
+Vitest cases covering the §D.5 invariants that need no GPU. **Next:** the
+device-touching half — MSAA targets, the mesh pipeline and shader, frame
+assembly in `gpu/frame.ts`, the DEV fixture command, and Net 2's visual
+goldens.

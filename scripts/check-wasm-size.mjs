@@ -8,21 +8,26 @@
  * kB = 1000 bytes — same measurement convention as check-bundle-size.mjs;
  * the enforced number is the one THIS gate computes.
  *
- * CAPTURE MODE: `CEILING_KB = null` ships with the gate. The container
- * this repo is developed in cannot build the WASM (no Rust toolchain), so
- * the ceiling cannot be set from an invented number — it is armed in the
- * geometry-crate commit from two CI-measured points this script prints:
- * the pre-lyon binary (the first CI run after this commit) and the
- * post-lyon binary (the geometry-crate CI run), per ADR-033. Until then
- * the gate measures, prints loudly, and passes.
+ * ARMED 2026-07-25 at the engine-integration commit — the first build in
+ * which lyon actually links into the binary — from a measured
+ * post-integration reference build of 64.62 kB gzip (152.14 kB raw).
+ * Unlike the JS closure, WASM size is deterministic for a given
+ * toolchain, so the margin covers toolchain drift and planned near-term
+ * growth rather than measurement noise. See ADR-033 Decision 4 for the
+ * derivation and for what should trigger a recalibration ADR.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 
-// null = capture mode (see header). Armed with a measured basis in the
-// geometry-crate commit — ADR-033 records the derivation rule.
-const CEILING_KB = null;
+// 80 kB gzip against the 64.62 kB measured basis — ~24 % headroom.
+// Sized to absorb toolchain drift (a few per cent across Rust releases)
+// and M2's path model, while a genuinely heavy new dependency — a text
+// shaper in M4/M5, a boolean-ops library in M3 — cannot land without
+// breaching this and forcing the ADR conversation. That is the gate's
+// whole purpose; recalibrate by ADR with a measured basis, never by
+// quietly editing this number (ADR-024's discipline, ADR-033 §4).
+const CEILING_KB = 80;
 
 const wasmPath = join(
   process.cwd(),
