@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openPalette, waitForShell } from "../e2e/helpers";
 
 /**
  * Visual goldens for path rendering — Net 2 (ADR-032).
@@ -48,9 +49,13 @@ async function hasWebGpuAdapter(page: Page): Promise<boolean> {
 
 async function loadFixtures(page: Page): Promise<void> {
   await page.goto("/");
-  await expect(page.getByRole("region", { name: "Graphite canvas" })).toBeVisible();
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.getByRole("combobox").fill("Load Path Fixtures");
+  // The shell suite's helpers, not hand-rolled selectors: they already
+  // encode the palette's real roles (the search input is a `searchbox`,
+  // not a `combobox` — the mistake that made this suite's first CI run
+  // time out) and they stay correct when the palette changes.
+  await waitForShell(page);
+  await openPalette(page);
+  await page.getByRole("searchbox").fill("Load Path Fixtures");
   await page.getByRole("option", { name: "Load Path Fixtures" }).first().click();
   // The status bar reports the framing zoom once the worker has applied it,
   // which is also the signal that the corpus is built and a frame has been
@@ -97,22 +102,21 @@ test.describe("path rendering goldens", () => {
     });
   }
 
-  test("fill rules differ where the geometry says they must", async ({ page }) => {
-    // Not a pixel comparison: this asserts the property the corpus exists
-    // to demonstrate, so a baseline regenerated against a broken build
-    // cannot quietly bless a wrong fill rule. The even-odd star is hollow
-    // at its centre, the non-zero star is not.
+  test("the corpus actually renders, and differs across tolerance buckets", async ({ page }) => {
+    // A pixel baseline is only as good as the frame it was blessed from,
+    // and the worst failure mode is a blank canvas: `--update-snapshots`
+    // would enshrine emptiness and every later run would agree with it.
+    // Two captures at different buckets must differ — which is false for a
+    // blank canvas, false for a frozen first frame, and true only if
+    // something was drawn and re-tessellated. No image decoder needed.
     await loadFixtures(page);
-    const centres = await page.evaluate(() => {
-      const canvas = document.querySelector("canvas");
-      if (!canvas) return null;
-      return { width: canvas.clientWidth, height: canvas.clientHeight };
-    });
-    expect(centres).not.toBeNull();
-    // The screenshots above are the evidence; this test's value is that it
-    // fails when the canvas is absent or zero-sized, which is the failure
-    // mode that would otherwise produce a blank baseline nobody notices.
-    expect(centres?.width ?? 0).toBeGreaterThan(0);
-    expect(centres?.height ?? 0).toBeGreaterThan(0);
+    const canvas = page.getByRole("region", { name: "Graphite canvas" });
+    const atFit = await canvas.screenshot();
+    await zoomTo(page, FIXTURE_ZOOM, 3);
+    const atThreeX = await canvas.screenshot();
+
+    expect(atFit.byteLength).toBeGreaterThan(0);
+    expect(atThreeX.byteLength).toBeGreaterThan(0);
+    expect(Buffer.compare(atFit, atThreeX)).not.toBe(0);
   });
 });

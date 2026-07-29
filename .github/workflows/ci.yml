@@ -158,8 +158,21 @@ jobs:
       # production preview. If the runner cannot produce a WebGPU adapter
       # the specs skip loudly — visible in the report, never a silent pass —
       # and the reference-machine run carries the duty instead.
+      # Enforced only once baselines exist. Playwright errors on a missing
+      # snapshot in CI rather than writing one, so without this guard the
+      # step would block every unrelated PR during the window between the
+      # suite landing and its baselines being generated (by the
+      # `Update visual goldens` workflow, which must run on Linux —
+      # snapshots are platform-suffixed and SwiftShader does not match a
+      # real GPU). The notice keeps the gap visible instead of silent.
       - name: Visual goldens (path rendering)
-        run: pnpm --filter @graphite/web run test:golden
+        run: |
+          if compgen -G "apps/web/e2e-golden/**/*.png" > /dev/null; then
+            pnpm --filter @graphite/web run test:golden
+          else
+            echo "::notice title=Visual goldens::No baselines committed yet — path rendering is UNVERIFIED. Run the 'Update visual goldens' workflow, review the images, and commit them."
+          fi
+        shell: bash
 
       - name: Upload report on failure
         if: failure()
