@@ -554,6 +554,13 @@ pipeline on purpose, so the MSAA frame-cost capture had one changed
 variable — [benchmarks/phase8-m1-msaa.md](../benchmarks/phase8-m1-msaa.md),
 an M1 exit criterion, now **captured and met**: under ~0.6 ms per frame at
 1255 × 838, bounded rather than isolated (no probe scene became GPU-bound
-at this resolution). **Next:** the mesh shader
-and pipeline, mesh draws inside `frame.ts`, the DEV fixture command, and
-Net 2's visual goldens.
+at this resolution). The **mesh pipeline** ✅ delivered
+2026-07-25 — `gpu/meshShader.ts` (camera at the SDF shader's binding and
+byte layout; a 256-aligned per-draw uniform carrying a 2×2 linear part,
+translate, and colour) and `gpu/meshPipeline.ts` (indexed `float32x2`
+draws, dynamic-offset bind group, culling off because tessellated winding
+is not consistent, blend state and sample count matched to the SDF
+pipeline field for field). The 2×2 is identity throughout M1 and exists so
+M2's resize semantics change a struct field rather than a pipeline.
+**Next:** mesh draws inside `frame.ts` against the cache, the DEV fixture
+command, and Net 2's visual goldens.

@@ -15,6 +15,14 @@ import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/re
 import type { UseEngineResult } from "../hooks/useEngine";
 import { EngineContext } from "../contexts/EngineContext";
 import { FilesProvider, useFiles } from "../features/files/FilesProvider";
+// FilesProvider mounts the discard dialog through a lazy island (ADR-033),
+// so the dialog only appears once that dynamic import resolves. Importing
+// it statically here puts it in the module registry up front: the
+// `import()` then resolves from cache in a microtask instead of racing
+// Vitest's first transform of the module against findBy*'s 1s timeout,
+// which is a race a slow or cold machine loses. Suspense is still
+// exercised — only the transform latency is removed.
+import "../features/files/DiscardConfirmDialog";
 import type { FileGateway } from "../features/files/gateway";
 import { serializeGraphiteFile } from "@graphite/document-model";
 import { DocumentModel } from "@graphite/document-model";
