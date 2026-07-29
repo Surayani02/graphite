@@ -19,6 +19,7 @@
  */
 
 import type { MsaaTarget } from "./gpu/targets";
+import { MeshCache } from "./gpu/meshCache";
 import type { SceneGraph } from "@graphite/engine";
 import { DEFAULT_CAMERA, type ToolType } from "@graphite/protocol";
 import type { DocumentModel } from "@graphite/document-model";
@@ -65,6 +66,24 @@ export interface EngineState {
    *  frame; reallocated when the canvas size or format changes
    *  (ADR-032 §2). */
   msaaTarget: MsaaTarget | null;
+  /** The frame's culled render list, retained so the draw planner can
+   *  read it after upload (ADR-032 Decision 1). One reference, not a
+   *  copy: the engine allocates a fresh array per cull. */
+  renderList: Float32Array;
+  /** Pipeline for tessellated path meshes (ADR-032 §7). */
+  meshPipeline: GPURenderPipeline | null;
+  /** Bind group serving every path draw, rebound per draw at a dynamic
+   *  offset into `meshUniformBuffer`. */
+  meshBindGroup: GPUBindGroup | null;
+  /** Ring of 256-aligned per-draw uniform records. */
+  meshUniformBuffer: GPUBuffer | null;
+  /** Tessellated meshes by engine node id (ADR-032 §4). */
+  meshCache: MeshCache;
+  /** Timestamp of the last pointer or wheel input, for the repair budget. */
+  lastInputAt: number;
+  /** Dev-only: the scene came from the path fixture corpus, so
+   *  scene-mutating input is suppressed (ADR-032 §5). */
+  fixtureMode: boolean;
   /** rgba8unorm-targeted pipeline for raster export, built lazily on first
    *  export and cached (Phase 7 M4b) — the live pipeline targets the
    *  swap-chain's bgra8 format, unsuitable for a copyable export texture. */
@@ -139,6 +158,13 @@ export function createInitialState(): EngineState {
     gpuContext: null,
     gpuPipeline: null,
     msaaTarget: null,
+    renderList: new Float32Array(0),
+    meshPipeline: null,
+    meshBindGroup: null,
+    meshUniformBuffer: null,
+    meshCache: new MeshCache(),
+    lastInputAt: 0,
+    fixtureMode: false,
     exportPipeline: null,
     cameraBuffer: null,
     shapeBuffer: null,

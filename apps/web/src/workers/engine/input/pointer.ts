@@ -14,6 +14,15 @@ export function handlePointerDown(
   button: number,
   _modifiers: PointerModifiers
 ): void {
+  // Fixture mode holds a scene the DocumentModel knows nothing about
+  // (ADR-032 §5), so any scene-mutating gesture would desynchronise the
+  // two. Camera input is untouched — panning and zooming the corpus is
+  // the entire point of loading it. Exiting is `document:new` or
+  // `document:load`, which rebuild from the model.
+  if (state.fixtureMode) {
+    state.lastInputAt = performance.now();
+    return;
+  }
   if (state.activeTool === "rectangle" || state.activeTool === "ellipse") {
     const [wx, wy] = cssToWorld(state, cssX, cssY);
     beginCreation(state, state.activeTool, wx, wy);

@@ -36,6 +36,7 @@ function fakeContext(status: EngineStatus = "running"): CommandContext {
       undo: vi.fn(),
       redo: vi.fn(),
       loadStress: vi.fn(),
+      loadPathFixtures: vi.fn(),
     },
     files: {
       save: vi.fn(),

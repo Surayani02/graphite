@@ -114,6 +114,8 @@ export interface UseEngineResult {
    *  load pipeline. Only the DEV-gated Debug commands call this; the
    *  worker handler is compiled out of production builds. */
   loadStress: (count: number) => void;
+  /** Dev-only: build the path fixture corpus (ADR-032 §5). */
+  loadPathFixtures: () => void;
 }
 
 const DEFAULT_STATS: EngineStats = { idle: false, frameNumber: 0, renderTimeMs: 0, fps: 0 };
@@ -298,6 +300,9 @@ export function useEngine(): UseEngineResult {
   const loadStress = useCallback((count: number) => {
     bridgeRef.current?.loadStress(count);
   }, []);
+  const loadPathFixtures = useCallback(() => {
+    bridgeRef.current?.loadPathFixtures();
+  }, []);
   const requestRecoverySnapshot = useCallback(() => {
     bridgeRef.current?.requestSave();
   }, []);
@@ -367,5 +372,6 @@ export function useEngine(): UseEngineResult {
     markSaved,
     exportRaster,
     loadStress,
+    loadPathFixtures,
   };
 }

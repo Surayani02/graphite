@@ -64,6 +64,9 @@ export function uploadRenderList(state: EngineState): void {
     state.vpH
   );
   state.shapeCount = list.length / 16;
+  // Retained for buildDrawPlan, which needs the record data the upload
+  // itself discards (ADR-032 Decision 1).
+  state.renderList = list;
   if (list.length === 0) return;
 
   if (!state.shapeBuffer || list.byteLength > state.shapeBuffer.size) {

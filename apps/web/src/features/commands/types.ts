@@ -46,6 +46,8 @@ export interface CommandContext {
      *  commands call this; the worker compiles the handler out of
      *  production builds. */
     readonly loadStress: (count: number) => void;
+    /** Dev-only: build the path fixture corpus (ADR-032 §5). */
+    readonly loadPathFixtures: () => void;
   };
   /** File actions (Phase 7 M2) — fire-and-forget; FilesProvider owns the
    *  async flow, pickers, discard guard, and error surfacing. */
