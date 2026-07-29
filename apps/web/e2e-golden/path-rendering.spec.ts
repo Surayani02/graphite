@@ -56,7 +56,16 @@ async function loadFixtures(page: Page): Promise<void> {
   await waitForShell(page);
   await openPalette(page);
   await page.getByRole("searchbox").fill("Load Path Fixtures");
-  await page.getByRole("option", { name: "Load Path Fixtures" }).first().click();
+  await expect(page.getByRole("option", { name: "Load Path Fixtures" })).toBeVisible();
+  // Enter, not click — the palette's own idiom (see e2e/palette.spec.ts),
+  // and the only one that works here. With a live engine the status bar
+  // updates every rendered frame, so the option list re-renders under
+  // Playwright's feet and a click loses the race against detachment
+  // ("element was detached from the DOM, retrying"). The shell suite never
+  // hit this because CI has no adapter there, so no frames render. Enter
+  // activates the already-focused first match and needs no stable element.
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Command palette" })).toBeHidden();
   // The status bar reports the framing zoom once the worker has applied it,
   // which is also the signal that the corpus is built and a frame has been
   // rendered — waiting on a timeout instead would be the flake this suite

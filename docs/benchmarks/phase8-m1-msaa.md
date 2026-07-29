@@ -120,6 +120,27 @@ not touch. FPS is the only metric in this HUD that can see GPU cost.
 Sample counts below `seconds × 20` mean panning stopped: idle frames blank
 the HUD (ADR-025 by design), and the gap biases the median.
 
+## Separate finding — the shell re-renders on every frame
+
+Surfaced by the visual-golden suite, 2026-07-29: with a live engine, a
+Playwright click on a palette option fails with _"element was detached
+from the DOM, retrying"_. The palette list is being re-created
+continuously, because `frame:rendered` stats flow into React state and
+every rendered frame therefore re-renders the shell — including surfaces
+that have nothing to do with the canvas.
+
+This is a real cost, not a test artifact, and it bears directly on the
+figures above: part of the ~18 ms frame at 10k is React work on the main
+thread, which is one reason neither probe scene became GPU-bound. The
+shell suite never hit it because CI has no adapter there, so no frames
+render at all.
+
+Not fixed here — it is a UI-architecture change (throttle the stats
+stream, or isolate the HUD behind its own subscription so a frame tick
+cannot re-render the palette), and it deserves its own measurement rather
+than a drive-by patch inside a rendering milestone. Recorded for the
+milestone that takes it.
+
 ## Separate finding — 100k render-path throughput
 
 A 100k baseline run was attempted and discarded (n=14, far too thin for a
