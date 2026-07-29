@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openPalette, waitForShell } from "../e2e/helpers";
+import { waitForShell } from "../e2e/helpers";
 
 /**
  * Visual goldens for path rendering — Net 2 (ADR-032).
@@ -48,27 +48,16 @@ async function hasWebGpuAdapter(page: Page): Promise<boolean> {
 }
 
 async function loadFixtures(page: Page): Promise<void> {
-  await page.goto("/");
-  // The shell suite's helpers, not hand-rolled selectors: they already
-  // encode the palette's real roles (the search input is a `searchbox`,
-  // not a `combobox` — the mistake that made this suite's first CI run
-  // time out) and they stay correct when the palette changes.
+  // `?pathFixtures` is a DEV-only entry point (useEngine.ts) that loads the
+  // corpus once the engine is running. Deliberately not the palette: a
+  // visual-regression suite must not depend on fuzzy search ranking, list
+  // virtualisation, or focus management, all of which can break the
+  // goldens without any rendering change — and all of which did, in CI.
+  await page.goto("/?pathFixtures");
   await waitForShell(page);
-  await openPalette(page);
-  await page.getByRole("searchbox").fill("Load Path Fixtures");
-  await expect(page.getByRole("option", { name: "Load Path Fixtures" })).toBeVisible();
-  // Enter, not click — the palette's own idiom (see e2e/palette.spec.ts),
-  // and the only one that works here. With a live engine the status bar
-  // updates every rendered frame, so the option list re-renders under
-  // Playwright's feet and a click loses the race against detachment
-  // ("element was detached from the DOM, retrying"). The shell suite never
-  // hit this because CI has no adapter there, so no frames render. Enter
-  // activates the already-focused first match and needs no stable element.
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog", { name: "Command palette" })).toBeHidden();
-  // The status bar reports the framing zoom once the worker has applied it,
-  // which is also the signal that the corpus is built and a frame has been
-  // rendered — waiting on a timeout instead would be the flake this suite
+  // The status bar reports the framing zoom once the worker has applied
+  // it, which is also the signal that the corpus is built and a frame has
+  // been rendered — a timeout here would be exactly the flake this suite
   // cannot tolerate.
   await expect(page.getByText(`zoom ${String(Math.round(FIXTURE_ZOOM * 100))}%`)).toBeVisible();
 }

@@ -303,6 +303,22 @@ export function useEngine(): UseEngineResult {
   const loadPathFixtures = useCallback(() => {
     bridgeRef.current?.loadPathFixtures();
   }, []);
+
+  // Dev-only deterministic entry point for the visual-golden suite
+  // (ADR-032 Net 2): `/?pathFixtures` loads the corpus as soon as the
+  // engine is running. The suite previously drove the palette instead,
+  // which made a *visual regression* test depend on fuzzy search ranking,
+  // list virtualisation, and focus management — three things that can
+  // break the goldens without any rendering change, and did, repeatedly,
+  // in CI. A screenshot test should reach its fixture by the shortest
+  // deterministic path. The palette command stays for humans; this is
+  // statically false in production, like every other ADR-027 surface.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (status !== "running") return;
+    if (!new URLSearchParams(window.location.search).has("pathFixtures")) return;
+    loadPathFixtures();
+  }, [status, loadPathFixtures]);
   const requestRecoverySnapshot = useCallback(() => {
     bridgeRef.current?.requestSave();
   }, []);
