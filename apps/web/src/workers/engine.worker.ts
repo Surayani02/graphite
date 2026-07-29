@@ -306,13 +306,24 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
       // so the corpus is built straight onto the scene graph and the
       // worker enters fixture mode (ADR-032 Decision 5).
       if (import.meta.env.DEV) {
-        buildPathFixtures(state);
-        updateCameraUniform(state);
-        uploadRenderList(state);
-        notifyViewport(state);
-        const ms = performance.getEntriesByName("path-fixtures").at(-1)?.duration ?? 0;
-        // eslint-disable-next-line no-console
-        console.info(`[fixtures] path corpus built in ${ms.toFixed(1)} ms`);
+        // Reported, not swallowed. A throw here used to leave the app in a
+        // plausible-looking state — engine still "running", scene still the
+        // demo, zoom still 100% — which is indistinguishable from "the
+        // message never arrived" and cost several CI rounds to tell apart.
+        // A dev surface that fails should say so.
+        try {
+          buildPathFixtures(state);
+          updateCameraUniform(state);
+          uploadRenderList(state);
+          notifyViewport(state);
+          const ms = performance.getEntriesByName("path-fixtures").at(-1)?.duration ?? 0;
+          // eslint-disable-next-line no-console
+          console.info(`[fixtures] path corpus built in ${ms.toFixed(1)} ms`);
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          console.error(`[fixtures] path corpus failed: ${detail}`);
+          post({ type: "engine:error", message: `Path fixtures failed: ${detail}` });
+        }
       }
       break;
     }

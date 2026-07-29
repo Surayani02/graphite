@@ -47,19 +47,56 @@ async function hasWebGpuAdapter(page: Page): Promise<boolean> {
   });
 }
 
+/** Page errors and console errors seen since navigation, so a failure
+ *  reports the cause instead of a bare timeout. */
+const pageErrors = new WeakMap<Page, string[]>();
+
+function watchForErrors(page: Page): void {
+  const seen: string[] = [];
+  pageErrors.set(page, seen);
+  page.on("pageerror", (error) => seen.push(`pageerror: ${error.message}`));
+  page.on("console", (message) => {
+    if (message.type() === "error") seen.push(`console.error: ${message.text()}`);
+  });
+}
+
+/** Everything the shell is currently saying — engine status included. */
+async function shellText(page: Page): Promise<string> {
+  return (await page.locator("body").innerText()).replace(/\s+/gu, " ").trim();
+}
+
 async function loadFixtures(page: Page): Promise<void> {
   // `?pathFixtures` is a DEV-only entry point (useEngine.ts) that loads the
   // corpus once the engine is running. Deliberately not the palette: a
   // visual-regression suite must not depend on fuzzy search ranking, list
   // virtualisation, or focus management, all of which can break the
   // goldens without any rendering change — and all of which did, in CI.
+  watchForErrors(page);
   await page.goto("/?pathFixtures");
   await waitForShell(page);
+
   // The status bar reports the framing zoom once the worker has applied
   // it, which is also the signal that the corpus is built and a frame has
-  // been rendered — a timeout here would be exactly the flake this suite
-  // cannot tolerate.
-  await expect(page.getByText(`zoom ${String(Math.round(FIXTURE_ZOOM * 100))}%`)).toBeVisible();
+  // been rendered. Wrapped so a failure carries the diagnosis: the zoom
+  // span only renders while the engine status is "running", so an engine
+  // error inside the fixture build looks identical to a missing element
+  // from the outside. Three CI rounds were spent inferring causes from
+  // bare timeouts; this makes the page say what happened.
+  const expected = `zoom ${String(Math.round(FIXTURE_ZOOM * 100))}%`;
+  try {
+    await expect(page.getByText(expected)).toBeVisible({ timeout: 15_000 });
+  } catch (error) {
+    const errors = pageErrors.get(page) ?? [];
+    throw new Error(
+      [
+        `Fixture corpus did not load — never saw "${expected}".`,
+        `Shell text: ${await shellText(page)}`,
+        `Page errors: ${errors.length > 0 ? errors.join(" | ") : "(none)"}`,
+        (error as Error).message,
+      ].join("\n"),
+      { cause: error }
+    );
+  }
 }
 
 /** Sets an exact zoom by ctrl+wheel at the viewport centre, then asserts
