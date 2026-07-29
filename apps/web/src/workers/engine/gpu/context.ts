@@ -73,6 +73,23 @@ export async function initWebGPU(state: EngineState, offscreen: OffscreenCanvas)
   if (!adapter) throw new Error("No WebGPU adapter found.");
 
   const device = await adapter.requestDevice({ label: "graphite-device" });
+
+  // WebGPU swallows validation and out-of-memory errors by default: the
+  // offending call is a no-op, the device keeps going, and a later
+  // `device.lost` says only that something died — which is exactly the
+  // report CI produced ("GPU lost (destroyed)") with no cause attached.
+  // Surfacing them costs one listener and turns a mystery into a message.
+  // These indicate a genuine fault in our own GPU calls, so reporting them
+  // as an engine error rather than a console line is the honest severity.
+  device.addEventListener("uncapturederror", (event) => {
+    const detail =
+      event instanceof GPUUncapturedErrorEvent ? event.error.message : "unknown GPU error";
+    self.postMessage({
+      type: "engine:error",
+      message: `GPU error: ${detail}`,
+    });
+  });
+
   void device.lost.then((info) => {
     state.running = false;
     self.postMessage({

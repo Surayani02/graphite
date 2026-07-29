@@ -70,3 +70,17 @@ jobs:
           path: apps/web/e2e-golden/**/*.png
           retention-days: 14
           if-no-files-found: error
+
+      # Traces and videos when the run fails. Without these a failure here
+      # is a single error string, which has repeatedly not been enough to
+      # tell a renderer fault from a harness fault.
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-failure-artifacts
+          path: |
+            apps/web/test-results/**
+            apps/web/playwright-report/**
+          retention-days: 7
+          if-no-files-found: ignore

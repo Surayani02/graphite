@@ -43,7 +43,11 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "list",
   use: {
     baseURL: "http://localhost:5174",
-    trace: "on-first-retry",
+    // `on-first-retry` with `retries: 0` means never — traces have not been
+    // captured on any run of this suite, which is why several CI failures
+    // had to be diagnosed from a bare error string. Retain on failure.
+    trace: "retain-on-failure",
+    video: isCI ? "retain-on-failure" : "off",
     headless: isCI,
     launchOptions: {
       args: isCI
