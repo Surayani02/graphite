@@ -318,9 +318,10 @@ export class EngineWorkerBridge {
    *  fixture corpus. The worker handler is compiled out of production, so
    *  this is a no-op there — as with `loadStress`, the sending command
    *  never registers outside dev either. */
-  loadPathFixtures(): void {
+  loadPathFixtures(zoom?: number): void {
     this.worker.postMessage({
       type: "debug:load_path_fixtures",
+      ...(zoom !== undefined ? { zoom } : {}),
     } satisfies MainToEngineMessage);
   }
 

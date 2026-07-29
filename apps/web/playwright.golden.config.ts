@@ -11,11 +11,28 @@ import { defineConfig, devices } from "@playwright/test";
  * would make it easy to forget why the golden specs cannot use the
  * production URL.
  *
- * Chromium is launched with software WebGPU: CI runners have no GPU, and
- * SwiftShader gives deterministic output across machines — which is what a
- * pixel comparison needs. If the adapter is unavailable anyway, the spec
- * skips loudly rather than passing silently (ADR-032's requirement).
+ * WebGPU is configured differently in CI and locally, on purpose.
+ *
+ * **CI** runs software WebGPU (SwiftShader): runners have no GPU, and
+ * software rasterisation is identical across machines, which is what a
+ * pixel comparison needs. Baselines come from here and nowhere else.
+ *
+ * **Locally** those same flags yield *no adapter at all* on a developer
+ * machine — SwiftShader for WebGPU is not available in the bundled
+ * Chromium on every platform — so every test skips and the suite cannot be
+ * debugged where iteration is fast. Local runs therefore use the real GPU,
+ * headed, because headless Chromium's GPU support varies by platform and
+ * version while a headed window's does not.
+ *
+ * This means a local run can produce *different pixels* from CI. That is
+ * fine and expected: Playwright suffixes snapshots per platform, so a
+ * local baseline never satisfies CI, and local runs exist to prove the
+ * mechanism — loading, zooming, skipping — not to bless images.
+ *
+ * If the adapter is unavailable anyway, the spec skips loudly rather than
+ * passing silently (ADR-032's requirement).
  */
+const isCI = Boolean(process.env.CI);
 export default defineConfig({
   testDir: "./e2e-golden",
   fullyParallel: false,
@@ -27,13 +44,16 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:5174",
     trace: "on-first-retry",
+    headless: isCI,
     launchOptions: {
-      args: [
-        "--enable-unsafe-webgpu",
-        "--use-webgpu-adapter=swiftshader",
-        "--use-angle=swiftshader",
-        "--enable-features=Vulkan",
-      ],
+      args: isCI
+        ? [
+            "--enable-unsafe-webgpu",
+            "--use-webgpu-adapter=swiftshader",
+            "--use-angle=swiftshader",
+            "--enable-features=Vulkan",
+          ]
+        : ["--enable-unsafe-webgpu"],
     },
   },
   expect: {

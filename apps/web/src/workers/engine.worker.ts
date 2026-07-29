@@ -312,7 +312,7 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
         // message never arrived" and cost several CI rounds to tell apart.
         // A dev surface that fails should say so.
         try {
-          buildPathFixtures(state);
+          buildPathFixtures(state, msg.zoom);
           updateCameraUniform(state);
           uploadRenderList(state);
           notifyViewport(state);
