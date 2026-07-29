@@ -567,5 +567,15 @@ in paint order between SDF runs, `repairMeshes` tessellates missing and
 stale entries largest-first within the frame budget, and the DEV
 `debug:load_path_fixtures` command builds a nine-shape corpus plus the
 alternating strip straight onto the scene graph, with fixture mode
-suppressing scene-mutating input. **Next:** Net 2's visual goldens and the
-M1 close.
+suppressing scene-mutating input. **Net 2** ✅ delivered 2026-07-25 —
+`playwright.golden.config.ts` and `e2e-golden/path-rendering.spec.ts`
+capture the corpus at three zooms in three different tolerance buckets
+against SwiftShader, with an adapter check that skips loudly rather than
+passing silently. Zoom is driven by an exact wheel delta (`exp(−Δ/1000)`)
+and asserted against the status bar, so a change to the zoom math fails
+the suite instead of quietly rebasing every baseline. **Baselines are
+generated on the reference machine** — the container has no browser or
+adapter, so this suite ships unrun (see
+[benchmarks/phase8-m1-msaa.md](../benchmarks/phase8-m1-msaa.md) for the
+same honesty rule applied to captures). **Next:** M1 close — exit-criteria
+review against the design doc.

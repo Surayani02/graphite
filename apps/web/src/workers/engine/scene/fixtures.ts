@@ -332,6 +332,16 @@ export function buildPathFixtures(state: EngineState): void {
     );
   }
 
+  // Deterministic framing. A pixel golden compares images, so the camera
+  // must land in exactly the same place every run — an inherited camera
+  // from whatever the user was doing would change every baseline. Centred
+  // on the corpus at a zoom that fits it, which also puts the starting
+  // tolerance bucket at −2, two boundaries below the zoom levels the
+  // golden spec drives to.
+  state.camX = (PITCH * 3) / 2;
+  state.camY = (PITCH * 3) / 2;
+  state.zoom = FIXTURE_ZOOM;
+
   state.fixtureMode = true;
   markSceneDirty(state);
   performance.mark("fixtures-end");
@@ -345,6 +355,9 @@ export function buildPathFixtures(state: EngineState): void {
 export function fixturePathCount(): number {
   return specs().length + STRIP_COUNT;
 }
+
+/** Framing zoom for the corpus — fixed so visual goldens are stable. */
+export const FIXTURE_ZOOM = 0.4;
 
 /** Alternating SDF/path strip length. */
 const STRIP_COUNT = 8;
