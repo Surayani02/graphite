@@ -18,6 +18,7 @@
  * typed function parameters."
  */
 
+import type { MsaaTarget } from "./gpu/targets";
 import type { SceneGraph } from "@graphite/engine";
 import { DEFAULT_CAMERA, type ToolType } from "@graphite/protocol";
 import type { DocumentModel } from "@graphite/document-model";
@@ -60,6 +61,10 @@ export interface EngineState {
   gpuDevice: GPUDevice | null;
   gpuContext: GPUCanvasContext | null;
   gpuPipeline: GPURenderPipeline | null;
+  /** Shared multisampled colour target, resolved to the swap chain each
+   *  frame; reallocated when the canvas size or format changes
+   *  (ADR-032 §2). */
+  msaaTarget: MsaaTarget | null;
   /** rgba8unorm-targeted pipeline for raster export, built lazily on first
    *  export and cached (Phase 7 M4b) — the live pipeline targets the
    *  swap-chain's bgra8 format, unsuitable for a copyable export texture. */
@@ -133,6 +138,7 @@ export function createInitialState(): EngineState {
     gpuDevice: null,
     gpuContext: null,
     gpuPipeline: null,
+    msaaTarget: null,
     exportPipeline: null,
     cameraBuffer: null,
     shapeBuffer: null,

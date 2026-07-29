@@ -544,7 +544,23 @@ The worker's **pure seams** ✅ delivered 2026-07-25 — `gpu/drawPlan.ts`
 (contiguous-run batching via `firstInstance`, paint order preserved) and
 `gpu/meshCache.ts` (tolerance buckets, the validity decision matrix, LRU
 with the same-frame guard, and the budgeted repair scheduler), with 26
-Vitest cases covering the §D.5 invariants that need no GPU. **Next:** the
-device-touching half — MSAA targets, the mesh pipeline and shader, frame
-assembly in `gpu/frame.ts`, the DEV fixture command, and Net 2's visual
-goldens.
+Vitest cases covering the §D.5 invariants that need no GPU. The **frame graph** ✅ delivered
+2026-07-25 — `gpu/targets.ts` (4× MSAA lifecycle, per-frame size/format
+reallocation) and `gpu/frame.ts` (single-pass assembly, resolve to the
+swap chain), with `render.ts` reduced to scheduling and **export routed
+through the same target configuration**, which WebGPU's sample-count
+matching now enforces rather than convention. Landed before the mesh
+pipeline on purpose, so the MSAA frame-cost capture had one changed
+variable — [benchmarks/phase8-m1-msaa.md](../benchmarks/phase8-m1-msaa.md),
+an M1 exit criterion, now **captured and met**: under ~0.6 ms per frame at
+1255 × 838, bounded rather than isolated (no probe scene became GPU-bound
+at this resolution). The **mesh pipeline** ✅ delivered
+2026-07-25 — `gpu/meshShader.ts` (camera at the SDF shader's binding and
+byte layout; a 256-aligned per-draw uniform carrying a 2×2 linear part,
+translate, and colour) and `gpu/meshPipeline.ts` (indexed `float32x2`
+draws, dynamic-offset bind group, culling off because tessellated winding
+is not consistent, blend state and sample count matched to the SDF
+pipeline field for field). The 2×2 is identity throughout M1 and exists so
+M2's resize semantics change a struct field rather than a pipeline.
+**Next:** mesh draws inside `frame.ts` against the cache, the DEV fixture
+command, and Net 2's visual goldens.
