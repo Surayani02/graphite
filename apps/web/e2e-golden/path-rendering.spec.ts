@@ -66,13 +66,11 @@ async function shellText(page: Page): Promise<string> {
 }
 
 async function loadFixtures(page: Page): Promise<void> {
-  // `?pathFixtures` is a DEV-only entry point (useEngine.ts) that loads the
-  // corpus once the engine is running. Deliberately not the palette: a
-  // visual-regression suite must not depend on fuzzy search ranking, list
-  // virtualisation, or focus management, all of which can break the
-  // goldens without any rendering change — and all of which did, in CI.
-  watchForErrors(page);
-  await page.goto("/?pathFixtures");
+  // No navigation here — `beforeEach` already loaded `/?pathFixtures`, the
+  // DEV-only entry point (useEngine.ts) that builds the corpus once the
+  // engine is running. Navigating again would boot a second engine and
+  // tear down the first, whose death notice lands in the live page's
+  // status bar.
   await waitForShell(page);
 
   // The status bar reports the framing zoom once the worker has applied
@@ -80,8 +78,7 @@ async function loadFixtures(page: Page): Promise<void> {
   // been rendered. Wrapped so a failure carries the diagnosis: the zoom
   // span only renders while the engine status is "running", so an engine
   // error inside the fixture build looks identical to a missing element
-  // from the outside. Three CI rounds were spent inferring causes from
-  // bare timeouts; this makes the page say what happened.
+  // from the outside.
   const expected = `zoom ${String(Math.round(FIXTURE_ZOOM * 100))}%`;
   try {
     await expect(page.getByText(expected)).toBeVisible({ timeout: 15_000 });
@@ -116,7 +113,13 @@ async function zoomTo(page: Page, from: number, to: number): Promise<void> {
 
 test.describe("path rendering goldens", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    // The adapter probe used to navigate to "/" and `loadFixtures` then
+    // navigated again. Two navigations means two engine boots, and the
+    // first one's teardown emitted "GPU lost (destroyed)" into the second
+    // page's status — which is exactly what CI reported. One navigation,
+    // and the probe runs against the page under test.
+    watchForErrors(page);
+    await page.goto("/?pathFixtures");
     const adapter = await hasWebGpuAdapter(page);
     // Loud, annotated skip — never a silent pass. ADR-032 requires that a
     // runner without an adapter is visible in the report, with the

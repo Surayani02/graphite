@@ -2,7 +2,7 @@ import { FRAME_BUDGET_MS } from "@graphite/protocol";
 import type { EngineState } from "../state";
 import { post } from "../messaging";
 import { updateCameraUniform, uploadRenderList, updateSelectionBuffer } from "./buffers";
-import { renderFrame } from "./frame";
+import { renderFrame, repairMeshes } from "./frame";
 
 /**
  * QUAL-02: the render loop reschedules itself every frame via a recursive
@@ -72,6 +72,13 @@ export function runFrameSlot(state: EngineState, now: number): number {
   updateCameraUniform(state);
   uploadRenderList(state);
   if (state.selectedId !== null) updateSelectionBuffer(state);
+
+  // Bring the mesh cache into step *before* the pass: repair tessellates
+  // and uploads buffers, and a render pass that also allocates is the kind
+  // of thing that stops being reasonable the moment anything else joins
+  // the frame. Must follow uploadRenderList, which is what publishes the
+  // culled list the repair queue is derived from.
+  repairMeshes(state);
 
   const renderMs = renderFrame(state);
   state.frameNumber += 1;

@@ -108,7 +108,11 @@ export function renderFrame(state: EngineState): number {
     );
   }
   state.gpuDevice.queue.submit([encoder.finish()]);
-  state.frameNumber += 1;
+  // `runFrameSlot` owns the counter and advances it after this returns, so
+  // the touch above and this eviction both see the same value — which is
+  // what the same-frame guard depends on. Incrementing here as well would
+  // both double-count and make a skipped slot (no device) advance a
+  // counter that means "frames actually run" (render-damage.test.ts).
   state.meshCache.evictToFit(state.frameNumber);
   return performance.now() - t0;
 }
