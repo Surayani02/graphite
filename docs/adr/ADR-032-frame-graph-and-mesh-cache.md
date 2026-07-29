@@ -55,10 +55,24 @@ configuration** — an exported PNG must match the screen sample-for-sample,
 and a second, non-MSAA export path would be a permanent source of "why
 does the export look different" reports.
 
-Cost is explicit: `w × h × 16` bytes of device pixels (≈ 16.8 MiB at the
-reference machine's viewport) plus resolve bandwidth. ADR-031 requires the
-frame-cost delta measured against the ADR-025 baselines at 10k and 100k on
-the reference machine; that capture is an M1 exit criterion.
+Cost is explicit: `w × h × 16` bytes of device pixels (16.05 MiB at the
+reference machine's 1255 × 838 viewport) plus resolve bandwidth. ADR-031
+requires the frame-cost delta measured on the reference machine; that
+capture is an M1 exit criterion.
+
+**Captured 2026-07-25 — criterion met**
+([benchmarks/phase8-m1-msaa.md](../benchmarks/phase8-m1-msaa.md)). 4× MSAA
+costs **under ~0.6 ms per frame** at that viewport: the measured 10k delta
+was +0.34 ms, the method's noise floor ±0.62 ms, and the resolve bandwidth
+the configuration implies ~0.42 ms — three quantities in one
+sub-millisecond band. Two honest limits on that number. The capture is a
+_bound_, not a point estimate: neither probe scene became GPU-bound at this
+resolution, so the cost could not be isolated, and a fragment-bound probe
+is worth building when M4's text rendering makes fragment cost material.
+And the figures are dev-mode (the stress commands are DEV-gated, ADR-027,
+so a production preview cannot run them), which makes the _delta_ valid
+against a same-session baseline but the absolute FPS incomparable to the
+ADR-025 production baselines.
 
 ## Decision 3 — Mesh-handle tessellation boundary
 

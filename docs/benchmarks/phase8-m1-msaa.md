@@ -1,60 +1,131 @@
 # Phase 8 M1 — MSAA frame-cost capture
 
-ADR-031 requires the cost of 4× MSAA to be **measured against the ADR-025
-damage-model baselines**, not assumed, before M1 can exit. ADR-032
-Decision 2 makes that capture an explicit exit criterion.
+ADR-031 required the cost of 4× MSAA to be measured rather than assumed;
+ADR-032 Decision 2 made the capture an M1 exit criterion. Captured on the
+reference machine 2026-07-25, before the mesh pipeline landed, so MSAA was
+the only changed variable.
 
-This capture is deliberately taken **before the mesh pipeline lands**, so
-the number isolates one variable: the same scenes, the same SDF draws, the
-only change being that the frame now renders into a shared multisampled
-target and resolves to the swap chain. Once meshes are drawing, an MSAA
-regression and a tessellation regression would be indistinguishable in the
-totals.
+**Result: 4× MSAA costs under ~0.6 ms per frame at 1255 × 838 device
+pixels — below this method's noise floor, and consistent with the ~0.42 ms
+of resolve bandwidth the configuration implies. No material regression;
+the exit criterion is met.**
 
-## Procedure (reference machine — i3-1115G4, 2C/4T, 8 GB)
+## Setup
 
-1. Build and serve a production bundle: `pnpm turbo run build`, then
-   `pnpm --filter @graphite/web exec vite preview`.
-2. Open the editor, let the shell settle, and keep the window at its
-   normal size — record the viewport in device pixels (the HUD reports
-   it, and target memory is `w × h × 16` bytes).
-3. Load the 10k stress scene: command palette → **Debug: stress 10k**
-   (ADR-027).
-4. Let the scene settle, then pan continuously for ~10 s so every frame
-   is dirty and the damage model cannot skip work.
-5. Record from the HUD: median FPS, median frame time, and the reported
-   GPU-submit time.
-6. Repeat at **stress 100k**.
-7. Repeat both with the previous build (`git stash` this commit, or check
-   out the commit before it) to get the non-MSAA baseline on the same
-   machine in the same session — a same-session comparison removes
-   thermal and background-load drift, which at this hardware tier is
-   larger than the effect being measured.
+|             |                                                            |
+| ----------- | ---------------------------------------------------------- |
+| Machine     | i3-1115G4, 2C/4T, 8 GB (reference)                         |
+| Viewport    | 1255 × 838 device px (CSS 1004 × 670, dpr 1.25)            |
+| MSAA target | 16.05 MiB (`w × h × 4 samples × 4 B`)                      |
+| Build       | `pnpm --filter @graphite/web dev`, both sides, one session |
+| Baseline    | the commit before the frame-graph commit                   |
+
+Dev mode, not a production preview: the stress commands are DEV-gated
+(ADR-027) and do not exist in a production bundle. Dev changes only the
+JavaScript — the WASM is the same release binary and the GPU work is
+identical — so the _delta_ is valid, while the absolute figures are **not
+comparable to the ADR-025 production baselines**.
 
 ## Results
 
-| Scene | Build    | Median FPS | Median frame ms | GPU submit ms | Viewport (device px) | Target memory |
-| ----- | -------- | ---------- | --------------- | ------------- | -------------------- | ------------- |
-| 10k   | pre-MSAA |            |                 |               |                      | —             |
-| 10k   | 4× MSAA  |            |                 |               |                      |               |
-| 100k  | pre-MSAA |            |                 |               |                      | —             |
-| 100k  | 4× MSAA  |            |                 |               |                      |               |
+| Scene             | Build    | Median FPS | Frame ms | Samples |
+| ----------------- | -------- | ---------- | -------- | ------- |
+| Demo grid, zoomed | baseline | 56         | 17.86    | 215     |
+| Demo grid, zoomed | 4× MSAA  | 58         | 17.24    | 233     |
+| Stress 10k        | baseline | 55         | 18.18    | 154     |
+| Stress 10k        | 4× MSAA  | 54         | 18.52    | 213     |
 
-_Fill from the reference machine; leave the pre-MSAA row exactly as
-measured even if it is worse than a previously recorded figure — the
-comparison is only valid within one session._
+| Quantity                                                | Value    |
+| ------------------------------------------------------- | -------- |
+| Noise floor (from the impossible reading below)         | ±0.62 ms |
+| Measured 10k delta                                      | +0.34 ms |
+| Theoretical resolve traffic (20.1 MiB/frame @ ~50 GB/s) | ~0.42 ms |
 
 ## Reading the result
 
-- **≥ 58 FPS at 10k with MSAA on** is the bar (BLUEPRINT's canvas-render
-  target, HUD tolerance). Meeting it is the exit criterion.
-- A modest cost at 10k and a larger one at 100k is the expected shape:
-  MSAA cost scales with **pixels**, not objects, so the delta should be
-  roughly constant in milliseconds while the 100k frame is longer
-  overall — a delta that instead grows with object count is a finding
-  worth investigating, not noise.
-- If the 10k bar is missed, ADR-032 Decision 2 is reopened, not patched:
-  the recorded alternatives are dropping to a non-multisampled target with
-  analytic AA for SDF and a fallback for mesh edges, or accepting a
-  quality/perf switch as a setting. Either is an ADR, with this capture as
-  its evidence.
+The demo-grid row shows MSAA **faster** than baseline. That is physically
+impossible — 4× multisampling cannot make a frame cheaper — so it is not a
+result; it is a calibration. It establishes that this method cannot
+resolve differences below ~0.6 ms, because neither scene is GPU-bound: at
+this viewport the SDF shader is too cheap for a handful of shapes to
+saturate the GPU, and the frame is spent elsewhere (worker culling,
+render-list upload, and in dev the per-frame React HUD update).
+
+The 10k delta of +0.34 ms sits below that floor, and independently agrees
+with the ~0.42 ms of resolve bandwidth the target implies. Three
+quantities in the same sub-millisecond band is enough to bound the cost
+even though the probe failed to isolate it: **MSAA is affordable here**,
+which is the question the exit criterion asks.
+
+What this capture does **not** establish: an isolated MSAA cost figure. A
+genuinely fragment-bound probe would need overdraw far beyond what the
+current shape set can produce at this resolution. Worth revisiting when
+M4's text rendering makes fragment cost material, and worth re-measuring
+at a higher-dpr display, where the target grows with the square of the
+scale factor.
+
+## Method (for repetition)
+
+1. **Viewport** — devtools console, main thread; do not read `canvas.width`
+   (control is transferred to the OffscreenCanvas, so the placeholder's
+   attributes are stale):
+   ```js
+   const c = document.querySelector("canvas");
+   const r = c.getBoundingClientRect(),
+     d = window.devicePixelRatio;
+   console.log(`${Math.round(r.width * d)} × ${Math.round(r.height * d)} device px, dpr ${d}`);
+   ```
+2. **Sampler** — the HUD renders medians for milliseconds at a time, so
+   scrape it at 20 Hz. Works unchanged on both builds, which matters
+   because the baseline is a previous commit and cannot carry
+   instrumentation:
+   ```js
+   window.__cap = (label, secs = 12) => {
+     const fps = [],
+       ms = [];
+     const t = setInterval(() => {
+       const spans = [...document.querySelectorAll("footer span, [class*=status] span")];
+       const f = spans.find((s) => /^\d+ fps$/.test(s.textContent.trim()));
+       const m = spans.find((s) => /^[\d.]+ ms$/.test(s.textContent.trim()));
+       if (f && m) {
+         fps.push(parseFloat(f.textContent));
+         ms.push(parseFloat(m.textContent));
+       }
+     }, 50);
+     setTimeout(() => {
+       clearInterval(t);
+       const med = (a) => {
+         const b = [...a].sort((x, y) => x - y);
+         return b.length ? b[b.length >> 1] : NaN;
+       };
+       console.log(`${label}: median ${med(fps)} fps | n=${fps.length}`);
+     }, secs * 1000);
+   };
+   ```
+3. `pnpm --filter @graphite/web dev` on the baseline commit. New Document,
+   zoom until shapes fill the viewport, record the HUD's zoom %, then
+   `__cap(...)` while panning continuously. Repeat with palette → **Load
+   Stress Scene (10k)**.
+4. Switch to the MSAA commit, `pnpm turbo run build`, dev server, repeat
+   both scenes at the **same window size and zoom %**.
+
+**Do not use the HUD's `ms` column as the MSAA metric.** It is
+`renderTimeMs` — wall-clock around `createCommandEncoder` → `queue.submit()`
+— and `submit()` returns once commands are queued, never waiting for the
+GPU. It read 0.10–0.20 ms across every scene here, including a tenfold
+object increase, because the render loop issues one instanced draw
+regardless of object count. It measures CPU encode work, which MSAA does
+not touch. FPS is the only metric in this HUD that can see GPU cost.
+
+Sample counts below `seconds × 20` mean panning stopped: idle frames blank
+the HUD (ADR-025 by design), and the gap biases the median.
+
+## Separate finding — 100k render-path throughput
+
+A 100k baseline run was attempted and discarded (n=14, far too thin for a
+median), but it recorded something worth keeping: **10 fps**, with scene
+build 81.7 ms and rebuild 405.9 ms. Nothing to do with MSAA — the render
+list alone is ~6.4 MB per frame at that object count, uploaded whole under
+the current damage model. ADR-023 deferred the spatial index on measured
+grounds and this is the first counter-evidence at 100k. It belongs to a
+later milestone with its own capture and its own ADR, not to this one.

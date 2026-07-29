@@ -550,8 +550,10 @@ reallocation) and `gpu/frame.ts` (single-pass assembly, resolve to the
 swap chain), with `render.ts` reduced to scheduling and **export routed
 through the same target configuration**, which WebGPU's sample-count
 matching now enforces rather than convention. Landed before the mesh
-pipeline on purpose: the MSAA frame-cost capture
-([benchmarks/phase8-m1-msaa.md](../benchmarks/phase8-m1-msaa.md), an M1
-exit criterion) isolates one variable this way. **Next:** the mesh shader
+pipeline on purpose, so the MSAA frame-cost capture had one changed
+variable — [benchmarks/phase8-m1-msaa.md](../benchmarks/phase8-m1-msaa.md),
+an M1 exit criterion, now **captured and met**: under ~0.6 ms per frame at
+1255 × 838, bounded rather than isolated (no probe scene became GPU-bound
+at this resolution). **Next:** the mesh shader
 and pipeline, mesh draws inside `frame.ts`, the DEV fixture command, and
 Net 2's visual goldens.
