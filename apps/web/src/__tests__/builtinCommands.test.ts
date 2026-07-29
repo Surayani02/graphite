@@ -28,6 +28,7 @@ function fakeContext(
       undo: vi.fn(),
       redo: vi.fn(),
       loadStress: vi.fn(),
+      loadPathFixtures: vi.fn(),
     },
     files: {
       save: vi.fn(),

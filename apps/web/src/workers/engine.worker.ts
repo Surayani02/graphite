@@ -36,6 +36,7 @@ import { startRenderLoop } from "./engine/gpu/render";
 import { exportRaster } from "./engine/gpu/export";
 import { buildDemoScene } from "./engine/scene/demo";
 import { buildStressScene } from "./engine/scene/stress";
+import { buildPathFixtures } from "./engine/scene/fixtures";
 import { rebuildSceneFromDocument } from "./engine/scene/rebuild";
 import { postDocumentNodes } from "./engine/scene/mutate";
 import {
@@ -135,6 +136,10 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
     // ── Document ───────────────────────────────────────────────────────────
 
     case "document:new": {
+      // Leaving fixture mode (ADR-032 §5) — the rebuild below restores a
+      // scene the DocumentModel owns, so input is safe again.
+      state.fixtureMode = false;
+      state.meshCache.clear();
       buildDemoScene(state);
       rebuildSceneFromDocument(state);
       updateCameraUniform(state);
@@ -147,6 +152,8 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
     }
 
     case "document:load": {
+      state.fixtureMode = false;
+      state.meshCache.clear();
       try {
         state.docModel = DocumentModel.fromJson(msg.json);
       } catch (err) {
@@ -290,6 +297,25 @@ self.onmessage = async (event: MessageEvent<MainToEngineMessage>): Promise<void>
 
     // ── Phase 7 Milestone 5 ───────────────────────────────────────────────
 
+    case "debug:load_path_fixtures": {
+      // Dev-only (ADR-027), same statically-false guard as the stress
+      // probe: the body and the fixture module tree-shake out of
+      // production, so a handcrafted postMessage against a production tab
+      // is a no-op. Unlike the stress scene this deliberately does NOT
+      // travel the document pipeline — there is no path DocNode until M2,
+      // so the corpus is built straight onto the scene graph and the
+      // worker enters fixture mode (ADR-032 Decision 5).
+      if (import.meta.env.DEV) {
+        buildPathFixtures(state);
+        updateCameraUniform(state);
+        uploadRenderList(state);
+        notifyViewport(state);
+        const ms = performance.getEntriesByName("path-fixtures").at(-1)?.duration ?? 0;
+        // eslint-disable-next-line no-console
+        console.info(`[fixtures] path corpus built in ${ms.toFixed(1)} ms`);
+      }
+      break;
+    }
     case "debug:load_stress": {
       // Dev-only surface (ADR-027). `import.meta.env.DEV` is statically
       // false in production builds, so this whole body — and, via

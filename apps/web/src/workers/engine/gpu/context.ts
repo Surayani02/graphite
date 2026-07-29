@@ -1,5 +1,6 @@
 import type { EngineState } from "../state";
 import { buildPipeline } from "./pipeline";
+import { buildMeshPipeline, MESH_UNIFORM_INITIAL_SLOTS, MESH_UNIFORM_STRIDE } from "./meshPipeline";
 
 const SHAPE_STRIDE = 64; // bytes: 16 × f32 — see graph.rs get_render_list doc comment
 
@@ -104,4 +105,25 @@ export async function initWebGPU(state: EngineState, offscreen: OffscreenCanvas)
   });
 
   state.gpuPipeline = await buildPipeline(device, state.canvasFormat);
+
+  const mesh = await buildMeshPipeline(device, state.canvasFormat);
+  state.meshPipeline = mesh.pipeline;
+  state.meshUniformBuffer = device.createBuffer({
+    label: "mesh-uniform-ring",
+    size: MESH_UNIFORM_INITIAL_SLOTS * MESH_UNIFORM_STRIDE,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  state.meshBindGroup = device.createBindGroup({
+    label: "mesh-bg",
+    layout: mesh.layout,
+    entries: [
+      { binding: 0, resource: { buffer: state.cameraBuffer } },
+      // Bound with an explicit size: a dynamic-offset binding addresses
+      // one record at a time, so the size is the record, not the ring.
+      {
+        binding: 1,
+        resource: { buffer: state.meshUniformBuffer, size: MESH_UNIFORM_STRIDE },
+      },
+    ],
+  });
 }

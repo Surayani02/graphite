@@ -63,6 +63,7 @@ function mockEngine(overrides: Partial<UseEngineResult> = {}): UseEngineResult {
     markSaved: vi.fn(),
     exportRaster: vi.fn(() => Promise.resolve(new Uint8Array())),
     loadStress: vi.fn(),
+    loadPathFixtures: vi.fn(),
     nodes: NODES,
     setSelection: vi.fn(),
     updateNode: vi.fn(),

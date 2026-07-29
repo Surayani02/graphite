@@ -467,6 +467,13 @@ export type MainToEngineMessage =
        *  no-op. */
       readonly type: "debug:load_stress";
       readonly count: number;
+    }
+  /** Dev-only (ADR-027): builds the path fixture corpus directly on the
+   *  scene graph and enters fixture mode. M1 renders paths the document
+   *  model cannot yet describe — the path DocNode kind is M2 — so the
+   *  corpus lives below the document layer (ADR-032 Decision 5). */
+  | {
+      readonly type: "debug:load_path_fixtures";
     };
 
 // ─── Performance constants ────────────────────────────────────────────────────

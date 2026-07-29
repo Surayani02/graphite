@@ -152,6 +152,15 @@ jobs:
       - name: Run E2E tests
         run: pnpm --filter @graphite/web exec playwright test
 
+      # Net 2 (ADR-032): pixel goldens for path rendering, against
+      # SwiftShader. Separate config because the fixture corpus is DEV-gated
+      # and only exists on the dev server, while the suite above runs a
+      # production preview. If the runner cannot produce a WebGPU adapter
+      # the specs skip loudly — visible in the report, never a silent pass —
+      # and the reference-machine run carries the duty instead.
+      - name: Visual goldens (path rendering)
+        run: pnpm --filter @graphite/web run test:golden
+
       - name: Upload report on failure
         if: failure()
         uses: actions/upload-artifact@v7

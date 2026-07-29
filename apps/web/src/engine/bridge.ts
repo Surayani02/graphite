@@ -303,6 +303,16 @@ export class EngineWorkerBridge {
     this.worker.postMessage({ type: "debug:load_stress", count } satisfies MainToEngineMessage);
   }
 
+  /** Dev-only companion to `loadStress` (ADR-027/032): builds the path
+   *  fixture corpus. The worker handler is compiled out of production, so
+   *  this is a no-op there — as with `loadStress`, the sending command
+   *  never registers outside dev either. */
+  loadPathFixtures(): void {
+    this.worker.postMessage({
+      type: "debug:load_path_fixtures",
+    } satisfies MainToEngineMessage);
+  }
+
   // ── Incoming messages ─────────────────────────────────────────────────────
 
   private handleWorkerMessage(msg: EngineToMainMessage): void {

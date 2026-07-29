@@ -43,6 +43,16 @@ export const debugCommands: readonly CommandDescriptor[] = [
     },
   },
   {
+    id: "debug.pathFixtures",
+    title: "Load Path Fixtures",
+    category: "Debug",
+    keywords: ["path", "fixtures", "vector", "tessellation", "golden", "mesh"],
+    enabled: (ctx) => ctx.engine.status === "running",
+    run: (ctx) => {
+      ctx.engine.loadPathFixtures();
+    },
+  },
+  {
     id: "debug.stress100k",
     title: "Load Stress Scene (100k)",
     category: "Debug",

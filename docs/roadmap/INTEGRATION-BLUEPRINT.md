@@ -562,5 +562,20 @@ draws, dynamic-offset bind group, culling off because tessellated winding
 is not consistent, blend state and sample count matched to the SDF
 pipeline field for field). The 2×2 is identity throughout M1 and exists so
 M2's resize semantics change a struct field rather than a pipeline.
-**Next:** mesh draws inside `frame.ts` against the cache, the DEV fixture
-command, and Net 2's visual goldens.
+**Path rendering is live** ✅ 2026-07-25 — `frame.ts` draws cached meshes
+in paint order between SDF runs, `repairMeshes` tessellates missing and
+stale entries largest-first within the frame budget, and the DEV
+`debug:load_path_fixtures` command builds a nine-shape corpus plus the
+alternating strip straight onto the scene graph, with fixture mode
+suppressing scene-mutating input. **Net 2** ✅ delivered 2026-07-25 —
+`playwright.golden.config.ts` and `e2e-golden/path-rendering.spec.ts`
+capture the corpus at three zooms in three different tolerance buckets
+against SwiftShader, with an adapter check that skips loudly rather than
+passing silently. Zoom is driven by an exact wheel delta (`exp(−Δ/1000)`)
+and asserted against the status bar, so a change to the zoom math fails
+the suite instead of quietly rebasing every baseline. **Baselines are
+generated on the reference machine** — the container has no browser or
+adapter, so this suite ships unrun (see
+[benchmarks/phase8-m1-msaa.md](../benchmarks/phase8-m1-msaa.md) for the
+same honesty rule applied to captures). **Next:** M1 close — exit-criteria
+review against the design doc.

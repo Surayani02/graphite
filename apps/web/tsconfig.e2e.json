@@ -9,5 +9,5 @@
     "declaration": false,
     "declarationMap": false
   },
-  "include": ["e2e/**/*"]
+  "include": ["e2e/**/*", "e2e-golden/**/*", "playwright.golden.config.ts"]
 }
