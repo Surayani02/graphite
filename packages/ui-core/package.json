@@ -25,7 +25,7 @@
   "dependencies": {
     "@floating-ui/react": "^0.27.20",
     "@graphite/protocol": "workspace:*",
-    "lucide-react": "^1.25.0",
+    "lucide-react": "^1.27.0",
     "react-aria-components": "1.19.0"
   },
   "peerDependencies": {
