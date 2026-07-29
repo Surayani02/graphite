@@ -8,6 +8,17 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Wait for a release to age before proposing it. pnpm 11 rejects
+    # lockfile entries younger than `minimumReleaseAge` (24 h) as a
+    # supply-chain guard, so a PR raised the hour a package ships is red at
+    # the install step through no fault of its contents — twice now
+    # (tailwind 4.3.2, jsdom 30.0.1), each costing a manual exception in
+    # pnpm-workspace.yaml. Cooling past the window makes the two policies
+    # agree instead of collide. Longer for majors: the first day of a major
+    # is when its regressions surface.
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
     groups:
       npm-minor-and-patch:
         update-types: ["minor", "patch"]
