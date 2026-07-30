@@ -146,6 +146,16 @@ jobs:
       - name: Build engine (WASM)
         run: pnpm --filter @graphite/engine run build
 
+      # The golden step below renders through SwiftShader, whose WebGPU
+      # path needs a Vulkan loader and ICD that GitHub runners do not ship.
+      # Without them Chrome destroys the device immediately and reports
+      # only "GPU lost (destroyed)". See .github/workflows/goldens.yml.
+      - name: Install Vulkan runtime (for SwiftShader WebGPU)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mesa-vulkan-drivers libvulkan1 vulkan-tools
+          vulkaninfo --summary | head -20 || echo "no Vulkan device reported"
+
       - name: Install Playwright browsers
         run: pnpm --filter @graphite/web exec playwright install --with-deps chromium
 

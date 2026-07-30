@@ -72,6 +72,20 @@ export async function initWebGPU(state: EngineState, offscreen: OffscreenCanvas)
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
   if (!adapter) throw new Error("No WebGPU adapter found.");
 
+  // Which adapter rendered a frame is not a detail: pixel goldens are
+  // adapter-specific, Playwright's snapshot suffix records only the
+  // platform, and a baseline captured on the wrong adapter looks correct
+  // and fails CI with no clue why. A renderer should be able to say what
+  // it is running on.
+  const info: GPUAdapterInfo | undefined = adapter.info;
+  const adapterLabel = info
+    ? [info.vendor, info.architecture, info.device, info.description]
+        .filter((part) => part !== undefined && part !== "")
+        .join(" / ") || "unknown adapter"
+    : "adapter info unavailable";
+  // eslint-disable-next-line no-console
+  console.info(`[gpu] adapter: ${adapterLabel}`);
+
   const device = await adapter.requestDevice({ label: "graphite-device" });
 
   // WebGPU swallows validation and out-of-memory errors by default: the
