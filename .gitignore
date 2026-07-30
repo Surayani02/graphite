@@ -36,3 +36,11 @@ desktop.ini
 # Playwright
 apps/web/playwright-report/
 apps/web/test-results/
+
+# Visual-golden baselines (ADR-032 Net 2) come from Linux CI — see
+# .github/workflows/goldens.yml. Playwright suffixes snapshots per platform,
+# so a Windows or macOS baseline can never satisfy CI and would only add
+# noise; ignore local ones so they cannot be committed by accident. Linux
+# baselines (…-linux.png) are deliberately NOT ignored: they are the gate.
+apps/web/e2e-golden/**/*-win32.png
+apps/web/e2e-golden/**/*-darwin.png

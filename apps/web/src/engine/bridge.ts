@@ -70,6 +70,9 @@ export interface EngineBridgeEvents {
 export class EngineWorkerBridge {
   private readonly worker: Worker;
   private readonly handlers: Partial<EngineBridgeEvents> = {};
+  /** Set by `destroy()`. A terminated worker's already-queued messages must
+   *  not reach handlers that now belong to a newer engine instance. */
+  private detached = false;
   private initialized = false;
   private readonly fps = new FpsTracker();
   // Phase 7 M4b: raster export is request->result/error correlated by id. A
@@ -85,6 +88,7 @@ export class EngineWorkerBridge {
       type: "module",
     });
     this.worker.onmessage = (e: MessageEvent<EngineToMainMessage>) => {
+      if (this.detached) return;
       this.handleWorkerMessage(e.data);
     };
     this.worker.onerror = (e: ErrorEvent) => {
@@ -141,6 +145,13 @@ export class EngineWorkerBridge {
 
   destroy(): void {
     this.initialized = false;
+    // Detach before terminating. A message posted by the worker moments
+    // before `terminate()` can still be delivered, and an `engine:error`
+    // from a bridge that is being torn down would set the *next* engine
+    // instance's status to "error" — a live, working engine reporting a
+    // dead one's failure. Observed in CI as "GPU lost (destroyed)" on a
+    // freshly booted page.
+    this.detached = true;
     this.worker.terminate();
   }
 
@@ -307,9 +318,10 @@ export class EngineWorkerBridge {
    *  fixture corpus. The worker handler is compiled out of production, so
    *  this is a no-op there — as with `loadStress`, the sending command
    *  never registers outside dev either. */
-  loadPathFixtures(): void {
+  loadPathFixtures(zoom?: number): void {
     this.worker.postMessage({
       type: "debug:load_path_fixtures",
+      ...(zoom !== undefined ? { zoom } : {}),
     } satisfies MainToEngineMessage);
   }
 

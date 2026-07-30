@@ -115,7 +115,7 @@ export interface UseEngineResult {
    *  worker handler is compiled out of production builds. */
   loadStress: (count: number) => void;
   /** Dev-only: build the path fixture corpus (ADR-032 §5). */
-  loadPathFixtures: () => void;
+  loadPathFixtures: (zoom?: number) => void;
 }
 
 const DEFAULT_STATS: EngineStats = { idle: false, frameNumber: 0, renderTimeMs: 0, fps: 0 };
@@ -300,9 +300,32 @@ export function useEngine(): UseEngineResult {
   const loadStress = useCallback((count: number) => {
     bridgeRef.current?.loadStress(count);
   }, []);
-  const loadPathFixtures = useCallback(() => {
-    bridgeRef.current?.loadPathFixtures();
+  const loadPathFixtures = useCallback((zoom?: number) => {
+    bridgeRef.current?.loadPathFixtures(zoom);
   }, []);
+
+  // Dev-only deterministic entry point for the visual-golden suite
+  // (ADR-032 Net 2): `/?pathFixtures` loads the corpus as soon as the
+  // engine is running. The suite previously drove the palette instead,
+  // which made a *visual regression* test depend on fuzzy search ranking,
+  // list virtualisation, and focus management — three things that can
+  // break the goldens without any rendering change, and did, repeatedly,
+  // in CI. A screenshot test should reach its fixture by the shortest
+  // deterministic path. The palette command stays for humans; this is
+  // statically false in production, like every other ADR-027 surface.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    if (status !== "running") return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("pathFixtures")) return;
+    // `?pathFixtures&zoom=1.5` frames the corpus at a chosen zoom. Goldens
+    // need an exact, reproducible zoom per tolerance bucket, and driving
+    // that through ctrl+wheel does not work: Chrome treats ctrl+wheel as
+    // *browser* zoom unless the page's listener is non-passive, so the
+    // gesture never reached the app at all.
+    const requested = Number(params.get("zoom"));
+    loadPathFixtures(Number.isFinite(requested) && requested > 0 ? requested : undefined);
+  }, [status, loadPathFixtures]);
   const requestRecoverySnapshot = useCallback(() => {
     bridgeRef.current?.requestSave();
   }, []);

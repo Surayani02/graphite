@@ -474,6 +474,10 @@ export type MainToEngineMessage =
    *  corpus lives below the document layer (ADR-032 Decision 5). */
   | {
       readonly type: "debug:load_path_fixtures";
+      /** Framing zoom. Omitted means the corpus's default fit. Exists so
+       *  visual goldens can capture a chosen tolerance bucket without
+       *  driving zoom through the UI. */
+      readonly zoom?: number;
     };
 
 // ─── Performance constants ────────────────────────────────────────────────────

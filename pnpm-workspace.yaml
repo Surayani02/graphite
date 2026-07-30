@@ -14,7 +14,26 @@ allowBuilds:
   turbo: true
   esbuild: true
 
+# ── Supply-chain policy exceptions ───────────────────────────────────────────
+# pnpm 11 refuses lockfile entries published within `minimumReleaseAge`
+# (24 h by default) — the window in which a hijacked or typosquatted release
+# is most often caught and unpublished. Dependabot proposes versions the
+# hour they ship, so every such PR is red at the install step until the
+# package ages out. Entries here are *dated, version-pinned* exceptions:
+# each says "this exact version was reviewed and accepted early".
+#
+# They expire naturally. Once a version is older than the window the entry
+# does nothing, so anything below that has aged should be deleted rather
+# than left as a standing trust statement nobody revisits.
+#
+# The durable fix is on the other side: `.github/dependabot.yml` now sets a
+# cooldown so PRs arrive after the window, and this list should stop
+# growing.
 minimumReleaseAgeExclude:
+  # jsdom 30.0.1 — merged in PR #13 (2026-07-29) hours after publication.
+  # Patch bump on a dev-only test environment; the whole unit suite runs
+  # against it, so a bad release would fail loudly rather than ship.
+  - jsdom@30.0.1
   - "@tailwindcss/node@4.3.2"
   - "@tailwindcss/oxide-android-arm64@4.3.2"
   - "@tailwindcss/oxide-darwin-arm64@4.3.2"

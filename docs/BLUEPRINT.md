@@ -87,7 +87,7 @@ stays off (ADR-003).
 | 0–5   | Foundation → engine → rendering → interaction → document model                                                                             | ✅ Complete |
 | 6     | UI shell                                                                                                                                   | ✅ Complete |
 | 7     | **MVP**: file save/load, export, undo/redo, damage model (dirty flags), 10k verification — spatial index deferred by measurement (ADR-023) | ✅ Complete |
-| 8     | **Vector & Text**: path render pipeline (ADR-031), geometry crate, booleans, text engine — epics C1, C4                                    | 🔨 M1       |
+| 8     | **Vector & Text**: path render pipeline (ADR-031), geometry crate, booleans, text engine — epics C1, C4                                    | 🔨 M1 ✅    |
 | 9     | **Layout**: auto layout, 2D grid, constraints — epic C2                                                                                    | ⏳          |
 | 10    | **Components & Variables**: component system, styles, variables and tokens — epics C3, A2                                                  | ⏳          |
 | 11    | **Backend**: Axum, PostgreSQL, Redis, JWT auth, S3                                                                                         | ⏳          |

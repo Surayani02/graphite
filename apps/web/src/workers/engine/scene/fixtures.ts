@@ -255,7 +255,7 @@ function specs(): readonly FixtureSpec[] {
  * per node) and the only fixture here that is about the worker rather
  * than the tessellator.
  */
-export function buildPathFixtures(state: EngineState): void {
+export function buildPathFixtures(state: EngineState, zoom?: number): void {
   performance.mark("fixtures-start");
   // Fresh graph rather than a clear() the engine does not expose, and the
   // id maps and selection cleared alongside it — `rebuildSceneFromDocument`
@@ -338,9 +338,9 @@ export function buildPathFixtures(state: EngineState): void {
   // on the corpus at a zoom that fits it, which also puts the starting
   // tolerance bucket at −2, two boundaries below the zoom levels the
   // golden spec drives to.
-  state.camX = (PITCH * 3) / 2;
-  state.camY = (PITCH * 3) / 2;
-  state.zoom = FIXTURE_ZOOM;
+  state.camX = CORPUS_WIDTH / 2;
+  state.camY = CORPUS_HEIGHT / 2;
+  state.zoom = zoom !== undefined && zoom > 0 ? zoom : FIXTURE_ZOOM;
 
   state.fixtureMode = true;
   markSceneDirty(state);
@@ -356,8 +356,26 @@ export function fixturePathCount(): number {
   return specs().length + STRIP_COUNT;
 }
 
-/** Framing zoom for the corpus — fixed so visual goldens are stable. */
-export const FIXTURE_ZOOM = 0.4;
+/**
+ * Total extent of the corpus in world units: a 3 × 3 grid of ≤400-unit
+ * shapes at `PITCH` spacing, plus the alternating strip below it.
+ *
+ * These exist because the first golden capture framed on the *grid's*
+ * centre and cut off both the triangle and — worse — the entire
+ * alternating strip, which is the fixture that exercises the draw plan's
+ * interleaving. A fixture outside the frame is a fixture that is not
+ * being tested, and nothing in the suite would have said so.
+ */
+const CORPUS_WIDTH = PITCH * 2 + 400;
+const CORPUS_HEIGHT = PITCH * 3 + 220;
+
+/**
+ * Framing zoom — fixed so visual goldens are stable, and low enough that
+ * the whole corpus fits the canvas with margin at the 1280 × 720 viewport
+ * the golden project uses. Deliberately generous: a panel-width change
+ * that shrinks the canvas should crop nothing.
+ */
+export const FIXTURE_ZOOM = 0.3;
 
 /** Alternating SDF/path strip length. */
 const STRIP_COUNT = 8;

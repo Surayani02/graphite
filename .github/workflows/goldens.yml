@@ -1,0 +1,100 @@
+# Regenerates the visual-golden baselines (Phase 8 M1, Net 2 — ADR-032).
+#
+# Manual only. Baselines must be produced on the platform that enforces
+# them: Playwright suffixes snapshots per platform, and SwiftShader on
+# Linux does not rasterise identically to a real GPU on Windows — a
+# locally-generated baseline would either be ignored by CI (wrong suffix)
+# or fail it (different pixels). CI is therefore the authority, and this
+# workflow is how a maintainer without a Linux box produces them.
+#
+# Run it from the Actions tab, download the `golden-baselines` artifact,
+# unpack it into apps/web/e2e-golden/, and commit — after LOOKING at the
+# images. `--update-snapshots` blesses whatever it renders, including a
+# regression.
+name: Update visual goldens
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-goldens:
+    name: Regenerate baselines
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/engine
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: "v0.13.1"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build engine (WASM)
+        run: pnpm --filter @graphite/engine run build
+
+      # Chrome's SwiftShader path for WebGPU goes through Dawn's Vulkan
+      # backend, so the software rasteriser needs a Vulkan loader and ICD
+      # present. GitHub runners ship neither. Without them Chrome creates a
+      # device and immediately destroys it — reported as
+      # "GPU lost (destroyed)" with no cause, which is precisely what this
+      # suite produced for several runs. The same packages on a developer
+      # machine with no hardware WebGPU support render the corpus correctly,
+      # which is the evidence for this being the difference.
+      - name: Install Vulkan runtime (for SwiftShader WebGPU)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mesa-vulkan-drivers libvulkan1 vulkan-tools
+          vulkaninfo --summary | head -20 || echo "no Vulkan device reported"
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @graphite/web exec playwright install --with-deps chromium
+
+      - name: Regenerate baselines
+        run: pnpm --filter @graphite/web run test:golden -- --update-snapshots
+
+      - name: Upload baselines
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-baselines
+          path: apps/web/e2e-golden/**/*.png
+          retention-days: 14
+          if-no-files-found: error
+
+      # Traces and videos when the run fails. Without these a failure here
+      # is a single error string, which has repeatedly not been enough to
+      # tell a renderer fault from a harness fault.
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-failure-artifacts
+          path: |
+            apps/web/test-results/**
+            apps/web/playwright-report/**
+          retention-days: 7
+          if-no-files-found: ignore

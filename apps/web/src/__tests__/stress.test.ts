@@ -67,7 +67,15 @@ describe("buildStressScene", () => {
     expect(() => {
       assertValidDocumentData(data);
     }).not.toThrow();
-  });
+    // Builds, serialises, re-parses and validates 100 000 nodes — four
+    // passes over the largest document the product accepts. Vitest's 5 s
+    // default is calibrated for unit tests and this is a bulk one: it
+    // passed on the previous reference machine and timed out on an
+    // i3-6006U, which made the *test* machine-dependent rather than the
+    // code. An explicit, generous budget keeps it a correctness check on
+    // any contributor's machine; throughput at 100k belongs to the
+    // benches, which record the machine that produced their numbers.
+  }, 60_000);
 
   it("paints the frame first, then shapes in index order", () => {
     const ids = (build(6).docModel?.getNodesInOrder() ?? []).map((n) => n.id);

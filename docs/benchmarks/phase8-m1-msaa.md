@@ -120,6 +120,29 @@ not touch. FPS is the only metric in this HUD that can see GPU cost.
 Sample counts below `seconds × 20` mean panning stopped: idle frames blank
 the HUD (ADR-025 by design), and the gap biases the median.
 
+## Open question — palette interaction under a live engine
+
+Surfaced by the visual-golden suite, 2026-07-29, and **left unresolved**.
+With a live engine in CI, driving the command palette failed twice in
+different ways: a click reported _"element was detached from the DOM,
+retrying"_, and a subsequent `Enter` did not activate the focused,
+enabled option at all. Neither reproduces in the shell suite, which runs
+without a WebGPU adapter and therefore never renders a frame.
+
+An earlier revision of this section blamed per-frame re-rendering of the
+whole shell. **That was wrong and is retracted**: `StatusBar` is the only
+subscriber to `EngineFrameContext`, so frame stats do not re-render the
+palette, and `frame:idle` is edge-triggered behind an `idleNotified`
+guard rather than fired per tick. The mechanism is not established, and
+nothing should rest on it — including any attribution of the frame times
+above to React work.
+
+The golden suite no longer depends on the palette (it uses a DEV-only
+`?pathFixtures` entry point), so this is not blocking. But "the palette
+may be unreliable while the engine renders" is serious enough to deserve
+a deliberate investigation with a reproduction, rather than an inference
+from CI logs.
+
 ## Separate finding — 100k render-path throughput
 
 A 100k baseline run was attempted and discarded (n=14, far too thin for a

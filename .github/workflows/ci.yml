@@ -83,6 +83,12 @@ jobs:
       - name: WASM size gate
         run: node scripts/check-wasm-size.mjs
 
+      # ADR-027 / ADR-032 §5 (invariant D.5-6): dev-only surfaces must not
+      # reach a production bundle. Tree-shaking guarantees this only while
+      # the modules stay side-effect-free, which broke once already.
+      - name: Dev-surface exclusion gate
+        run: node scripts/check-dev-surfaces.mjs
+
       - name: Type check
         run: pnpm turbo run typecheck
 
@@ -146,6 +152,16 @@ jobs:
       - name: Build engine (WASM)
         run: pnpm --filter @graphite/engine run build
 
+      # The golden step below renders through SwiftShader, whose WebGPU
+      # path needs a Vulkan loader and ICD that GitHub runners do not ship.
+      # Without them Chrome destroys the device immediately and reports
+      # only "GPU lost (destroyed)". See .github/workflows/goldens.yml.
+      - name: Install Vulkan runtime (for SwiftShader WebGPU)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq mesa-vulkan-drivers libvulkan1 vulkan-tools
+          vulkaninfo --summary | head -20 || echo "no Vulkan device reported"
+
       - name: Install Playwright browsers
         run: pnpm --filter @graphite/web exec playwright install --with-deps chromium
 
@@ -158,8 +174,21 @@ jobs:
       # production preview. If the runner cannot produce a WebGPU adapter
       # the specs skip loudly — visible in the report, never a silent pass —
       # and the reference-machine run carries the duty instead.
+      # Enforced only once baselines exist. Playwright errors on a missing
+      # snapshot in CI rather than writing one, so without this guard the
+      # step would block every unrelated PR during the window between the
+      # suite landing and its baselines being generated (by the
+      # `Update visual goldens` workflow, which must run on Linux —
+      # snapshots are platform-suffixed and SwiftShader does not match a
+      # real GPU). The notice keeps the gap visible instead of silent.
       - name: Visual goldens (path rendering)
-        run: pnpm --filter @graphite/web run test:golden
+        run: |
+          if compgen -G "apps/web/e2e-golden/**/*.png" > /dev/null; then
+            pnpm --filter @graphite/web run test:golden
+          else
+            echo "::notice title=Visual goldens::No baselines committed yet — path rendering is UNVERIFIED. Run the 'Update visual goldens' workflow, review the images, and commit them."
+          fi
+        shell: bash
 
       - name: Upload report on failure
         if: failure()

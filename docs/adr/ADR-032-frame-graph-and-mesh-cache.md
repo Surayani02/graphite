@@ -136,6 +136,21 @@ lie in the document model.
   goldens (SwiftShader WebGPU) as the integration net, with a loud,
   annotated skip plus a reference-machine procedure if CI cannot produce
   an adapter — recorded, never silent.
+- **Amendment (2026-07-30, Net 2 status).** The loud-skip fallback this
+  ADR wrote down as a contingency is now the operating state. GitHub's
+  runners render the corpus correctly and cannot capture it: two tolerance
+  buckets produce byte-identical pixels while the engine reports no error.
+  Installing the Vulkan runtime fixed an earlier device loss and is kept;
+  `--enable-unsafe-swiftshader` and `--disable-gpu-sandbox` changed
+  nothing. The suite now probes the capability once per worker and skips
+  with an annotation when captures are indistinguishable, so a runner that
+  gains the capability re-enables the gate without a code change. Net 2 is
+  discharged on a reference machine —
+  [benchmarks/phase8-m1-goldens.md](../benchmarks/phase8-m1-goldens.md).
+  The cost is stated there rather than glossed: the pixel path (pipeline
+  state, uniform layout, MSAA resolve) is unguarded between reference
+  runs, while Net 1 continues to gate tessellated geometry exactly on
+  every push.
 - **Amendment (2026-07-25, geometry commit).** Net 1's exactness has a
   precondition this ADR did not state: _nothing upstream of a hashed byte
   may call libm_. Two cross-platform drifts proved it on the maintainer's
