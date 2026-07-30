@@ -585,5 +585,14 @@ runner re-enables the gate automatically. Procedure and cost:
 [benchmarks/phase8-m1-goldens.md](../benchmarks/phase8-m1-goldens.md);
 decision recorded as an ADR-032 amendment.
 
-**Next:** M1 close — exit-criteria
-review against the design doc.
+**M1 is complete** — close record and carried-forward ledger:
+[PHASE8-M1-CLOSE.md](./PHASE8-M1-CLOSE.md). Every exit criterion met, with
+Net 2 discharged on a reference machine rather than in CI (stated as a
+real coverage reduction, not smoothed over). Two D.5 invariants had no
+assertion until the close and now do: tessellation call counts, and
+dev-surface exclusion as a build gate.
+
+**Next: M2 — the path model and pen tool.** `DocNodeKind` `"path"`,
+`.graphite` v2 with its migration, path ops (C1.1, C1.4), and exact
+hit-testing — at which point the fixture corpus retires in favour of real
+documents.

@@ -83,6 +83,12 @@ jobs:
       - name: WASM size gate
         run: node scripts/check-wasm-size.mjs
 
+      # ADR-027 / ADR-032 §5 (invariant D.5-6): dev-only surfaces must not
+      # reach a production bundle. Tree-shaking guarantees this only while
+      # the modules stay side-effect-free, which broke once already.
+      - name: Dev-surface exclusion gate
+        run: node scripts/check-dev-surfaces.mjs
+
       - name: Type check
         run: pnpm turbo run typecheck
 
