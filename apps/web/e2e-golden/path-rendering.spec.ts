@@ -136,6 +136,14 @@ test.describe("path rendering goldens", () => {
 
     expect(atFit.byteLength).toBeGreaterThan(0);
     expect(atThreeX.byteLength).toBeGreaterThan(0);
-    expect(Buffer.compare(atFit, atThreeX)).not.toBe(0);
+    // A failure here means both captures are byte-identical, which for two
+    // different tolerance buckets means the canvas is uniform — blank, or a
+    // frame that never reached the screenshot. Stated explicitly because
+    // "not.toBe(0)" on its own does not communicate that.
+    expect(
+      Buffer.compare(atFit, atThreeX),
+      "captures at two tolerance buckets are byte-identical — the canvas is " +
+        "blank or the rendered frame is not reaching the screenshot"
+    ).not.toBe(0);
   });
 });

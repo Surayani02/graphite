@@ -56,6 +56,18 @@ export default defineConfig({
             "--use-webgpu-adapter=swiftshader",
             "--use-angle=swiftshader",
             "--enable-features=Vulkan",
+            // Chrome gates the SwiftShader fallback behind this flag; without
+            // it the GPU process may run software rendering but decline to
+            // composite the result, which presents as a canvas that renders
+            // correctly and screenshots blank. That is the signature CI
+            // produced: engine alive, no GPU error, fixtures loaded, yet
+            // every capture identical and 100 % different from a baseline
+            // taken under the same flags on a machine that has a display.
+            "--enable-unsafe-swiftshader",
+            // The runner has no /dev/dri and no display; the GPU sandbox has
+            // nothing to isolate and can prevent the software path from
+            // initialising at all.
+            "--disable-gpu-sandbox",
           ]
         : ["--enable-unsafe-webgpu"],
     },
