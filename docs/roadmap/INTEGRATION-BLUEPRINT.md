@@ -577,5 +577,13 @@ the suite instead of quietly rebasing every baseline. **Baselines are
 generated on the reference machine** — the container has no browser or
 adapter, so this suite ships unrun (see
 [benchmarks/phase8-m1-msaa.md](../benchmarks/phase8-m1-msaa.md) for the
-same honesty rule applied to captures). **Next:** M1 close — exit-criteria
+same honesty rule applied to captures). **Net 2 status (2026-07-30):** verified on a reference machine, skipped
+with an annotation in CI — GitHub's runners render the corpus but cannot
+capture it (identical pixels across tolerance buckets, no engine error).
+The suite probes that capability rather than opting out, so a capable
+runner re-enables the gate automatically. Procedure and cost:
+[benchmarks/phase8-m1-goldens.md](../benchmarks/phase8-m1-goldens.md);
+decision recorded as an ADR-032 amendment.
+
+**Next:** M1 close — exit-criteria
 review against the design doc.
